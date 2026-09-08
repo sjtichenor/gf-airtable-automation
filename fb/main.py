@@ -858,12 +858,12 @@ class FacebookSync:
                     
                     if metric_name == 'fb_reels_total_plays' and values:
                         views = values[0].get('value', 0)
-                if views is None:
-                    print("      ⚠️ Insights returned no play count; leaving Views unchanged")
                     elif metric_name == 'post_video_likes_by_reaction_type' and values:
                         # Sum all reaction types for total likes
                         reactions = values[0].get('value', {})
                         likes = sum(reactions.values()) if isinstance(reactions, dict) else 0
+                if views is None:
+                    print("      ⚠️ Insights returned no play count; leaving Views unchanged")
             else:
                 print(f"      ⚠️ Video insights failed: {insights_response.status_code}")
                 # Try to get basic post info as fallback
