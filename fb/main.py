@@ -880,6 +880,11 @@ class FacebookSync:
                     created_time = post_data.get('created_time')
                     if created_time:
                         date_posted = self.format_facebook_date(created_time)
+                else:
+                    # Both calls failed (rate limit, dead token, missing permission).
+                    # We know nothing about this post; do not write zeros for it.
+                    print(f"      ⚠️ Fallback also failed ({post_response.status_code}); skipping this post")
+                    return None
             
             # Try to get creation date if we don't have it
             if not date_posted:
