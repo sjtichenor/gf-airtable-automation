@@ -845,7 +845,7 @@ class FacebookSync:
             insights_response = requests.get(insights_url, params=insights_params)
             print(f"      📡 Video insights API response status: {insights_response.status_code}")
             
-            views = 0
+            views = None  # unknown until the insights call succeeds; never written as 0
             likes = 0
             date_posted = None
             
@@ -858,6 +858,8 @@ class FacebookSync:
                     
                     if metric_name == 'fb_reels_total_plays' and values:
                         views = values[0].get('value', 0)
+                if views is None:
+                    print("      ⚠️ Insights returned no play count; leaving Views unchanged")
                     elif metric_name == 'post_video_likes_by_reaction_type' and values:
                         # Sum all reaction types for total likes
                         reactions = values[0].get('value', {})
@@ -995,10 +997,12 @@ class FacebookSync:
             print(f"      💾 Updating Airtable record: {record_id}")
             
             # Build update fields
-            update_fields = {
-                'Views': metrics['views'],
-                'Likes': metrics['likes']
-            }
+            # A failed insights call (e.g. a token without read_insights) must not
+            # overwrite a real view count with 0. On 2026-09-08 exactly that zeroed
+            # 78 posts before the run was cancelled.
+            update_fields = {'Likes': metrics['likes']}
+            if metrics.get('views') is not None:
+                update_fields['Views'] = metrics['views']
             
             # Handle Date Posted logic
             date_action = "none"
