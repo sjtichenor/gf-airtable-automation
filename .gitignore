@@ -1,3 +1,7 @@
 .env
-venv
+.env.*
 .env_old
+venv/
+.venv/
+__pycache__/
+*.pyc
