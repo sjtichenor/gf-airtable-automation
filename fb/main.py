@@ -677,7 +677,13 @@ class FacebookSync:
         # Load Facebook pages from environment
         facebook_pages_json = os.getenv('FACEBOOK_PAGES', '[]')
         try:
-            self.facebook_pages = json.loads(facebook_pages_json)
+            # Take the first JSON document and tolerate anything pasted after it
+            # (a stray newline or shell prompt). A strict json.loads rejected the
+            # whole list on 2026-09-08 over trailing text and left zero pages.
+            cleaned = facebook_pages_json.strip()
+            self.facebook_pages, end = json.JSONDecoder().raw_decode(cleaned)
+            if cleaned[end:].strip():
+                print(f"⚠️ Ignoring {len(cleaned[end:].strip())} chars of trailing text after the FACEBOOK_PAGES JSON")
             print(f"✅ Loaded {len(self.facebook_pages)} Facebook pages from environment")
         except (json.JSONDecodeError, KeyError) as e:
             print(f"❌ Error loading Facebook pages from environment: {e}")
