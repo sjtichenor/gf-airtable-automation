@@ -117,7 +117,7 @@
         
 #         for channel in channels:
 #             fields = channel['fields']
-#             channel_name = fields.get('Channel', '').strip()
+#             channel_name = fields.get('Social Media Account', '').strip()
 #             facebook_profile = fields.get('Facebook Profile', '').strip()
 #             current_followers = fields.get('Facebook Followers', 0)
             
@@ -1264,7 +1264,7 @@ class FacebookSync:
         
         for channel in all_channels:
             fields = channel['fields']
-            channel_name = fields.get('Channel', '').strip()
+            channel_name = fields.get('Social Media Account', '').strip()
             facebook_profile = fields.get('Facebook Profile', '').strip()
             current_followers = fields.get('Facebook Followers', 0)
             
