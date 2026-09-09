@@ -1122,11 +1122,25 @@ class FacebookSync:
             ]
             if page_id:
                 variants.append(("page-scoped post insights", f"{base}/{page_id}_{post_id}/insights", {'metric': 'post_impressions_unique,post_video_views'}))
+            # The seven Reels metrics we want to add: each alone, then together in
+            # groups, to learn which can share one request. One poison metric
+            # (post_video_likes_by_reaction_type) blanks a whole request, so this
+            # is how we find any others before trusting a combined call.
+            reels = ['post_impressions_unique', 'post_video_avg_time_watched', 'post_video_view_time',
+                     'fb_reels_replay_count', 'post_video_followers', 'post_video_social_actions',
+                     'post_video_retention_graph']
+            for m in reels:
+                variants.append((f"reel metric {m}", f"{base}/{post_id}/video_insights", {'metric': m}))
+            variants.append(("all seven together", f"{base}/{post_id}/video_insights", {'metric': ','.join(reels)}))
+            variants.append(("plays + reach + watch time", f"{base}/{post_id}/video_insights",
+                             {'metric': 'fb_reels_total_plays,post_impressions_unique,post_video_avg_time_watched,post_video_view_time'}))
+            variants.append(("replays + followers + social", f"{base}/{post_id}/video_insights",
+                             {'metric': 'fb_reels_replay_count,post_video_followers,post_video_social_actions'}))
             print(f"🧪 PROBE for {post_id} via {base}")
             for label, url, params in variants:
                 try:
                     r = requests.get(url, params={**params, 'access_token': access_token}, timeout=30)
-                    print(f"   [{r.status_code}] {label}: {r.text[:400]}")
+                    print(f"   [{r.status_code}] {label}: {r.text[:900]}")
                 except Exception as exc:
                     print(f"   [ERR] {label}: {exc}")
             print("🧪 PROBE done; exiting without writing")
