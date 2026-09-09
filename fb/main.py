@@ -858,11 +858,15 @@ class FacebookSync:
             print(f"      📡 Video insights API response status: {insights_response.status_code}")
             
             views = None  # unknown until the insights call succeeds; never written as 0
-            likes = 0
+            likes = None  # likewise: only written once some call actually returned it
             date_posted = None
             
             if insights_response.status_code == 200:
                 insights_data = insights_response.json()
+                if not insights_data.get('data'):
+                    # 200 with no metrics is not "zero"; it is "nothing usable".
+                    print("      ⚠️ Video insights returned 200 but no data; treating as failed")
+                    insights_response.status_code = 0
                 
                 for insight in insights_data.get('data', []):
                     metric_name = insight.get('name')
@@ -913,6 +917,18 @@ class FacebookSync:
                     if created_time:
                         date_posted = self.format_facebook_date(created_time)
             
+            if likes is None:
+                # Insights gave no reaction metric; read the plain like count.
+                post_response = requests.get(
+                    f"{self.facebook_base_url}/{post_id}",
+                    params={'access_token': access_token, 'fields': 'likes.summary(true)'},
+                )
+                if post_response.status_code == 200:
+                    likes = post_response.json().get('likes', {}).get('summary', {}).get('total_count')
+                if likes is None:
+                    print("      ⚠️ No like count obtainable; skipping this post")
+                    return None
+
             metrics = {
                 'views': views,
                 'likes': likes,
