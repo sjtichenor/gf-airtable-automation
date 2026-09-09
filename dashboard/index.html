@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Good Future Media · Analytics</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --border:#e5e8ee; --text:#0f172a; --muted:#64748b; --muted2:#94a3b8;
+  --accent:#2563eb; --accent-soft:#dbeafe; --up:#16a34a; --down:#dc2626; --chip:#eef2f7; --chip-on:#0f172a; --chip-on-text:#fff;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12); --grid:#eef1f5;
+}
+html[data-theme=dark]{
+  --bg:#0b0e14; --card:#121722; --border:#1f2734; --text:#e6e9ef; --muted:#8b95a7; --muted2:#5b6577;
+  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --chip:#1a2130; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#1c2431;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.bar{max-width:1440px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em;font-size:16px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed)}
+.brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
+.spacer{flex:1}
+.meta{color:var(--muted);font-size:12px;display:flex;gap:14px;align-items:center}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
+button.ghost:hover{border-color:var(--muted2)}
+main{max-width:1440px;margin:0 auto;padding:20px 24px 60px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.filters select{appearance:none;background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid var(--border);color:var(--text);padding:8px 30px 8px 12px;border-radius:10px;font:inherit;font-size:13px;box-shadow:var(--shadow);min-width:150px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--border);background:var(--chip);color:var(--text);padding:6px 11px;border-radius:999px;font-size:12px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}
+.chip i{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--c)}
+.chip.on{background:var(--chip-on);color:var(--chip-on-text);border-color:var(--chip-on)}
+.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
+.toggle input{accent-color:var(--accent)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:500}
+.kpi .v{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;margin-top:2px;color:var(--muted)}
+.d.up{color:var(--up)} .d.down{color:var(--down)}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
+.card h3{margin:0;font-size:13px;font-weight:600}
+.card .sub{font-size:12px;color:var(--muted);margin:2px 0 10px}
+.span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}.span4{grid-column:span 4}
+@media(max-width:1000px){.span8,.span6,.span4{grid-column:span 12}}
+.chart{position:relative;height:280px}
+.chart.tall{height:340px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;cursor:pointer}
+th.sorted::after{content:" ↓";color:var(--accent)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td.t{max-width:380px;overflow:hidden;text-overflow:ellipsis}
+tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.tablewrap{overflow-x:auto;max-height:520px;overflow-y:auto}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#fff;background:var(--c,#999)}
+.empty{color:var(--muted);padding:30px;text-align:center}
+#overlay{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:20;font-size:15px;color:var(--muted);text-align:center;padding:20px}
+#overlay b{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
+.avatar{width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:8px;object-fit:cover;background:var(--chip)}
+.foot{margin-top:24px;color:var(--muted2);font-size:12px}
+</style>
+</head>
+<body>
+<div id="overlay"><div><b>Loading analytics</b><span id="ovmsg">Fetching the latest snapshot…</span></div></div>
+<header><div class="bar">
+  <div class="brand"><span class="dot"></span>Good Future Media<span class="sub">Analytics</span></div>
+  <div class="spacer"></div>
+  <div class="meta"><span id="stamp"></span>
+    <button class="ghost" id="refresh" title="Pull fresh numbers from Airtable now">Refresh data</button>
+    <button class="ghost" id="theme">Dark</button>
+    <button class="ghost" id="share" title="Copy a link with the current filters">Copy link</button>
+    <a href="/dashboard/logout" class="ghost" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px">Sign out</a>
+  </div>
+</div></header>
+<main>
+  <div class="filters">
+    <select id="fShow"><option value="">All shows</option></select>
+    <select id="fChannel"><option value="">All accounts</option></select>
+    <select id="fEditor"><option value="">All editors</option></select>
+    <select id="fRange">
+      <option value="7">Last 7 days</option><option value="30">Last 30 days</option>
+      <option value="90" selected>Last 90 days</option><option value="180">Last 6 months</option>
+      <option value="365">Last 12 months</option><option value="ytd">Year to date</option><option value="all">All time</option>
+    </select>
+    <div class="chips" id="platforms"></div>
+    <label class="toggle"><input type="checkbox" id="fOwned"> GF-owned only</label>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card span8"><h3>Followers over time</h3><div class="sub" id="followersSub"></div><div class="chart tall"><canvas id="cFollowers"></canvas></div></div>
+    <div class="card span4"><h3>Net follower change per day</h3><div class="sub">Gains minus losses across the selection</div><div class="chart tall"><canvas id="cNet"></canvas></div></div>
+
+    <div class="card span8"><h3>Views by week posted</h3><div class="sub">Lifetime views of clips, grouped by the week they went out</div><div class="chart"><canvas id="cViewsWeek"></canvas></div></div>
+    <div class="card span4"><h3>Views by platform</h3><div class="sub">Share of views in the selected range</div><div class="chart"><canvas id="cDonut"></canvas></div></div>
+
+    <div class="card span6"><h3>Posting volume</h3><div class="sub">Posts per week, with average views per post</div><div class="chart"><canvas id="cVolume"></canvas></div></div>
+    <div class="card span6"><h3>Views by show</h3><div class="sub">Top shows in the selected range</div><div class="chart"><canvas id="cShows"></canvas></div></div>
+
+    <div class="card span12"><h3>Accounts</h3><div class="sub">Follower count is the latest snapshot; changes compare against the snapshot nearest the start of each window</div><div class="tablewrap"><table id="tAccounts"></table></div></div>
+    <div class="card span6"><h3>Editors</h3><div class="sub">Clips posted in the range, by the editor who cut them</div><div class="tablewrap"><table id="tEditors"></table></div></div>
+    <div class="card span6"><h3>Top posts</h3><div class="sub">Most viewed in the selected range</div><div class="tablewrap"><table id="tTop"></table></div></div>
+  </div>
+  <div class="foot" id="foot"></div>
+</main>
+
+<script>
+(() => {
+const PCOLORS = {Instagram:'#e1306c', TikTok:'#22c1c3', YouTube:'#ff3d3d', X:'#7c8a9e', Facebook:'#1877f2', Threads:'#a78bfa', LinkedIn:'#0a66c2', Other:'#9ca3af'};
+const PORDER = ['Instagram','TikTok','YouTube','X','Facebook','Threads','LinkedIn','Other'];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => n == null ? '—' : Math.abs(n) >= 1e6 ? (n/1e6).toFixed(n%1e6===0?0:1)+'M' : Math.abs(n) >= 1e4 ? Math.round(n/1e3)+'K' : Math.abs(n) >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(Math.round(n));
+const full = n => n == null ? '—' : Math.round(n).toLocaleString();
+const pct = (a, b) => (b && a != null) ? ((a-b)/b*100) : null;
+const signed = n => n == null ? '—' : (n > 0 ? '+' : '') + fmt(n);
+const deltaHtml = (d, p) => d == null ? '<span class="d">— no earlier snapshot</span>' : `<span class="d ${d>0?'up':d<0?'down':''}">${signed(d)}${p!=null?` (${p>0?'+':''}${p.toFixed(1)}%)`:''}</span>`;
+const iso = d => d.toISOString().slice(0,10);
+const addDays = (s, n) => { const d = new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return iso(d); };
+const weekStart = s => { const d = new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - (d.getUTCDay()+6)%7); return iso(d); };
+const monthLabel = s => new Date(s+'T00:00:00Z').toLocaleDateString(undefined,{month:'short',day:'numeric',timeZone:'UTC'});
+
+let DATA = null, charts = {}, state = {show:'', channel:'', editor:'', range:'90', platforms:new Set(PORDER), owned:false, sort:{}};
+const byId = {};
+
+// ── theme ──────────────────────────────────────────────────────────────
+function applyTheme(t){ document.documentElement.dataset.theme = t; $('#theme').textContent = t==='dark' ? 'Light' : 'Dark'; try{localStorage.setItem('gf-theme',t)}catch(e){} if (DATA) render(); }
+let theme = 'light'; try{ theme = localStorage.getItem('gf-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light'); }catch(e){}
+applyTheme(theme);
+$('#theme').onclick = () => applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+
+// ── url state ──────────────────────────────────────────────────────────
+function readUrl(){ const q = new URLSearchParams(location.search);
+  if (q.get('show')) state.show = q.get('show'); if (q.get('account')) state.channel = q.get('account'); if (q.get('editor')) state.editor = q.get('editor');
+  if (q.get('range')) state.range = q.get('range'); if (q.get('owned')==='1') state.owned = true;
+  if (q.get('platforms')) state.platforms = new Set(q.get('platforms').split(',').filter(Boolean)); }
+function writeUrl(){ const q = new URLSearchParams();
+  if (state.show) q.set('show', state.show); if (state.channel) q.set('account', state.channel); if (state.editor) q.set('editor', state.editor);
+  if (state.range!=='90') q.set('range', state.range); if (state.owned) q.set('owned','1');
+  if (state.platforms.size !== PORDER.length) q.set('platforms', [...state.platforms].join(','));
+  history.replaceState(null,'', location.pathname + (q.toString()?'?'+q:'')); }
+$('#share').onclick = async () => { writeUrl(); try{ await navigator.clipboard.writeText(location.href); $('#share').textContent='Copied'; setTimeout(()=>$('#share').textContent='Copy link',1500);}catch(e){ prompt('Link', location.href); } };
+
+// ── load ───────────────────────────────────────────────────────────────
+async function load(){
+  const r = await fetch('/dashboard/api/data', {credentials:'same-origin'});
+  if (r.status === 401) { location.href = '/dashboard/login'; return; }
+  if (r.status === 503) { const s = await r.json(); $('#ovmsg').textContent = s.last_error ? 'Last refresh failed: '+s.last_error+' — retrying' : 'First load pulls everything from Airtable; about a minute…'; setTimeout(load, 5000); return; }
+  DATA = await r.json();
+  DATA.channels.forEach(c => byId[c.id] = c); DATA.shows.forEach(s => byId[s.id] = s);
+  buildFilters(); $('#overlay').style.display='none'; render();
+}
+$('#refresh').onclick = async () => { const before = DATA && DATA.generated_at; $('#refresh').textContent='Refreshing…';
+  await fetch('/dashboard/api/refresh', {method:'POST', credentials:'same-origin'});
+  const poll = async () => { const s = await (await fetch('/dashboard/api/status',{credentials:'same-origin'})).json();
+    if (s.generated_at && s.generated_at !== before) { await load(); $('#refresh').textContent='Refresh data'; }
+    else if (s.last_error && !s.refreshing) { $('#refresh').textContent='Refresh failed'; alert('Refresh failed: '+s.last_error); }
+    else setTimeout(poll, 3000); };
+  setTimeout(poll, 3000); };
+
+function buildFilters(){
+  readUrl();
+  const shows = [...DATA.shows].sort((a,b)=>a.name.localeCompare(b.name));
+  $('#fShow').innerHTML = '<option value="">All shows</option>' + shows.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+  const editors = [...new Set(DATA.posts.map(p=>p.editor).filter(Boolean))].sort();
+  $('#fEditor').innerHTML = '<option value="">All editors</option>' + editors.map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join('');
+  fillChannels();
+  $('#platforms').innerHTML = PORDER.filter(p => DATA.posts.some(x=>x.platform===p) || DATA.followers.some(x=>x.platform===p))
+    .map(p => `<span class="chip ${state.platforms.has(p)?'on':''}" data-p="${p}" style="--c:${PCOLORS[p]}"><i></i>${p}</span>`).join('');
+  $('#platforms').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; const p = c.dataset.p;
+    if (e.shiftKey || e.metaKey) { state.platforms = new Set([p]); } else if (state.platforms.has(p)) { if (state.platforms.size>1) state.platforms.delete(p); } else state.platforms.add(p);
+    [...$('#platforms').children].forEach(el => el.classList.toggle('on', state.platforms.has(el.dataset.p))); render(); };
+  $('#fShow').value = state.show; $('#fEditor').value = state.editor; $('#fRange').value = state.range; $('#fOwned').checked = state.owned;
+  $('#fShow').onchange = e => { state.show = e.target.value; state.channel=''; fillChannels(); render(); };
+  $('#fChannel').onchange = e => { state.channel = e.target.value; render(); };
+  $('#fEditor').onchange = e => { state.editor = e.target.value; render(); };
+  $('#fRange').onchange = e => { state.range = e.target.value; render(); };
+  $('#fOwned').onchange = e => { state.owned = e.target.checked; state.channel=''; fillChannels(); render(); };
+}
+function fillChannels(){
+  const chs = DATA.channels.filter(c => (!state.show || c.shows.includes(state.show)) && (!state.owned || c.owned)).sort((a,b)=>a.name.localeCompare(b.name));
+  $('#fChannel').innerHTML = '<option value="">All accounts</option>' + chs.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  $('#fChannel').value = chs.some(c=>c.id===state.channel) ? state.channel : '';
+  if (!chs.some(c=>c.id===state.channel)) state.channel = '';
+}
+
+// ── selection ──────────────────────────────────────────────────────────
+function range(){
+  const end = iso(new Date());
+  let start;
+  if (state.range === 'all') { const ds = DATA.followers.map(f=>f.date).concat(DATA.posts.map(p=>p.date).filter(Boolean)); start = ds.length ? ds.reduce((a,b)=>a<b?a:b) : addDays(end,-365); if (start < addDays(end,-1095)) start = addDays(end,-1095); }
+  else if (state.range === 'ytd') start = end.slice(0,4)+'-01-01';
+  else start = addDays(end, -(parseInt(state.range,10)-1));
+  return {start, end};
+}
+function channelOk(c){ return c && (!state.show || c.shows.includes(state.show)) && (!state.channel || c.id===state.channel) && (!state.owned || c.owned); }
+function select(){
+  const {start, end} = range();
+  const showName = state.show ? byId[state.show].name : '';
+  const posts = DATA.posts.filter(p => {
+    if (!state.platforms.has(p.platform)) return false;
+    if (state.editor && p.editor !== state.editor) return false;
+    const c = p.channel ? byId[p.channel] : null;
+    if (state.channel && p.channel !== state.channel) return false;
+    if (state.owned && !(c && c.owned)) return false;
+    if (state.show && !((c && c.shows.includes(state.show)) || (showName && p.show === showName))) return false;
+    if (state.range === 'all') return true;
+    const d = p.date || p.created; return d && d >= start && d <= end;
+  });
+  const followers = DATA.followers.filter(f => state.platforms.has(f.platform) && channelOk(byId[f.channel]) && f.date <= end);
+  return {start, end, posts, followers};
+}
+
+// series: key -> sorted [{date,count}]
+function seriesOf(rows){ const m = new Map(); rows.forEach(r => { const k = r.channel+'|'+r.platform; (m.get(k) || m.set(k,[]).get(k)).push(r); }); m.forEach(v => v.sort((a,b)=>a.date<b.date?-1:1)); return m; }
+const valueAt = (arr, day) => { let v = null; for (const r of arr) { if (r.date > day) break; v = r.count; } return v; };
+const firstOnOrAfter = (arr, day) => { for (const r of arr) if (r.date >= day) return r.count; return null; };
+
+// ── render ─────────────────────────────────────────────────────────────
+function render(){
+  writeUrl();
+  const sel = select(); const {start, end, posts, followers} = sel;
+  const css = getComputedStyle(document.documentElement);
+  Chart.defaults.color = css.getPropertyValue('--muted').trim(); Chart.defaults.borderColor = css.getPropertyValue('--grid').trim();
+  Chart.defaults.font.family = 'Inter, sans-serif'; Chart.defaults.font.size = 11;
+  Object.values(charts).forEach(c => c.destroy()); charts = {};
+
+  // followers now + delta
+  const series = seriesOf(followers);
+  let now = 0, then = 0, haveThen = false, anySeries = false;
+  series.forEach(arr => { const v = valueAt(arr, end); if (v == null) return; anySeries = true; now += v;
+    const t = valueAt(arr, addDays(start,-1)) ?? (arr[0].date < end ? firstOnOrAfter(arr, start) : null); if (t != null && arr.length > 1) { then += t; haveThen = true; } });
+  const fDelta = haveThen ? now - then : null;
+
+  const sum = k => posts.reduce((a,p)=>a+(p[k]||0),0);
+  const views = sum('views'), likes = sum('likes'), comments = sum('comments');
+  const dated = posts.filter(p=>p.date);
+  const kp = [
+    ['Followers', fmt(now), anySeries ? deltaHtml(fDelta, haveThen ? pct(now, then) : null) : '<span class="d">no snapshots yet</span>'],
+    ['Posts', full(posts.length), `<span class="d">${dated.length < posts.length ? (posts.length-dated.length)+' undated' : (posts.length/Math.max(1,(new Date(end)-new Date(start))/864e5/7)).toFixed(1)+' per week'}</span>`],
+    ['Views', fmt(views), `<span class="d">${full(views)}</span>`],
+    ['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`],
+    ['Comments', fmt(comments), `<span class="d">${posts.some(p=>p.comments!=null) ? full(posts.filter(p=>p.comments!=null).length)+' posts with data' : 'Facebook only so far'}</span>`],
+    ['Avg views / post', fmt(posts.length ? views/posts.length : null), `<span class="d">median ${fmt(median(posts.map(p=>p.views||0)))}</span>`],
+  ];
+  $('#kpis').innerHTML = kp.map(([l,v,d]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
+
+  renderFollowers(sel, series); renderNet(sel, series); renderViewsWeek(posts, start, end); renderDonut(posts); renderVolume(posts, start, end); renderShows(posts);
+  renderAccounts(sel, series); renderEditors(posts); renderTop(posts);
+  $('#stamp').textContent = 'Data as of ' + new Date(DATA.generated_at).toLocaleString() + (DATA.build_seconds ? ` · pulled in ${DATA.build_seconds}s` : '');
+  $('#foot').textContent = `${full(DATA.posts.length)} posts, ${full(DATA.followers.length)} follower snapshots and ${DATA.channels.length} accounts loaded. Follower history starts ${DATA.followers.length ? DATA.followers.map(f=>f.date).reduce((a,b)=>a<b?a:b) : '—'}; views are lifetime totals per post as last synced.`;
+}
+function median(a){ if (!a.length) return null; const s=[...a].sort((x,y)=>x-y); const m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+function days(start, end){ const out=[]; for (let d=start; d<=end; d=addDays(d,1)) out.push(d); return out; }
+function weeks(start, end){ const out=[]; for (let d=weekStart(start); d<=end; d=addDays(d,7)) out.push(d); return out; }
+function line(id, cfg){ charts[id] = new Chart($('#'+id), cfg); }
+const legend = {position:'bottom', labels:{boxWidth:10, boxHeight:10, usePointStyle:true, padding:14}};
+
+function renderFollowers({start,end}, series){
+  const ds = days(start, end); if (ds.length > 400) { /* thin to weekly for long ranges */ }
+  const step = ds.length > 200 ? Math.ceil(ds.length/200) : 1; const xs = ds.filter((_,i)=>i%step===0 || i===ds.length-1);
+  // group: by platform normally; by account when a single platform is picked and no account chosen
+  const byAccount = state.platforms.size === 1 && !state.channel;
+  const groups = new Map();
+  series.forEach((arr, k) => { const [ch, p] = k.split('|'); const g = byAccount ? (byId[ch]?.name || ch) : p; (groups.get(g) || groups.set(g, []).get(g)).push(arr); });
+  let entries = [...groups.entries()].map(([g, arrs]) => ({g, data: xs.map(d => { let s=0, any=false; arrs.forEach(a => { const v = valueAt(a, d); if (v!=null){s+=v;any=true;} }); return any ? s : null; })}));
+  entries.sort((a,b)=> (b.data[b.data.length-1]||0) - (a.data[a.data.length-1]||0)); if (byAccount) entries = entries.slice(0,8);
+  if (!byAccount) entries.sort((a,b)=>PORDER.indexOf(a.g)-PORDER.indexOf(b.g));
+  $('#followersSub').textContent = entries.length ? (byAccount ? `Top accounts on ${[...state.platforms][0]}` : 'Daily snapshots, summed per platform') : 'No follower snapshots in this selection yet';
+  const palette = ['#2563eb','#db2777','#059669','#d97706','#7c3aed','#0891b2','#dc2626','#4b5563'];
+  line('cFollowers', {type:'line', data:{labels: xs.map(monthLabel), datasets: entries.map((e,i) => ({label:e.g, data:e.data, borderColor: byAccount ? palette[i%8] : PCOLORS[e.g], backgroundColor: byAccount ? palette[i%8] : PCOLORS[e.g], tension:.3, pointRadius: xs.length>60?0:2, borderWidth:2, spanGaps:true}))},
+    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{y:{ticks:{callback:fmt}, grid:{color:Chart.defaults.borderColor}}, x:{grid:{display:false}, ticks:{maxTicksLimit:10}}}}});
+}
+function renderNet({start,end}, series){
+  const ds = days(start, end);
+  const net = ds.map(d => { let s=0, any=false; series.forEach(a => { const v=valueAt(a,d), p=valueAt(a,addDays(d,-1)); if (v!=null && p!=null){ s+=v-p; any=true; } }); return any ? s : null; });
+  const step = ds.length > 120 ? 7 : 1; let labels = ds, data = net;
+  if (step > 1) { const w = new Map(); ds.forEach((d,i) => { if (net[i]==null) return; const k = weekStart(d); w.set(k,(w.get(k)||0)+net[i]); }); labels=[...w.keys()]; data=[...w.values()]; }
+  const up = getComputedStyle(document.documentElement).getPropertyValue('--up').trim(), down = getComputedStyle(document.documentElement).getPropertyValue('--down').trim();
+  line('cNet', {type:'bar', data:{labels: labels.map(monthLabel), datasets:[{data, backgroundColor: data.map(v => v>=0?up:down), borderRadius:3}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${signed(c.parsed.y)}${step>1?' this week':''}`}}}, scales:{y:{ticks:{callback:fmt}}, x:{grid:{display:false}, ticks:{maxTicksLimit:8}}}}});
+}
+function renderViewsWeek(posts, start, end){
+  const ws = weeks(start, end), idx = new Map(ws.map((w,i)=>[w,i]));
+  const plats = PORDER.filter(p => state.platforms.has(p) && posts.some(x=>x.platform===p));
+  const data = Object.fromEntries(plats.map(p=>[p, ws.map(()=>0)]));
+  posts.forEach(p => { if (!p.date) return; const i = idx.get(weekStart(p.date)); if (i!=null && data[p.platform]) data[p.platform][i] += p.views||0; });
+  line('cViewsWeek', {type:'bar', data:{labels: ws.map(monthLabel), datasets: plats.map(p=>({label:p, data:data[p], backgroundColor:PCOLORS[p], borderRadius:2, stack:'v'}))},
+    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{stacked:true, ticks:{callback:fmt}}}}});
+}
+function renderDonut(posts){
+  const m = {}; posts.forEach(p => m[p.platform] = (m[p.platform]||0) + (p.views||0));
+  const plats = PORDER.filter(p=>m[p]);
+  line('cDonut', {type:'doughnut', data:{labels:plats, datasets:[{data:plats.map(p=>m[p]), backgroundColor:plats.map(p=>PCOLORS[p]), borderWidth:0, hoverOffset:6}]},
+    options:{responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend, tooltip:{callbacks:{label: c => { const t = c.dataset.data.reduce((a,b)=>a+b,0); return ` ${c.label}: ${full(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`; }}}}}});
+}
+function renderVolume(posts, start, end){
+  const ws = weeks(start, end), idx = new Map(ws.map((w,i)=>[w,i])); const n = ws.map(()=>0), v = ws.map(()=>0);
+  posts.forEach(p => { if (!p.date) return; const i = idx.get(weekStart(p.date)); if (i!=null){ n[i]++; v[i]+=p.views||0; } });
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  line('cVolume', {type:'bar', data:{labels: ws.map(monthLabel), datasets:[{type:'bar', label:'Posts', data:n, backgroundColor:accent+'99', borderRadius:2, yAxisID:'y'}, {type:'line', label:'Avg views / post', data:n.map((c,i)=>c?Math.round(v[i]/c):null), borderColor:'#f59e0b', backgroundColor:'#f59e0b', tension:.3, pointRadius:2, borderWidth:2, yAxisID:'y2'}]},
+    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{position:'left', ticks:{precision:0}}, y2:{position:'right', grid:{display:false}, ticks:{callback:fmt}}}}});
+}
+function renderShows(posts){
+  const m = {}; posts.forEach(p => { const k = p.show || (p.channel && byId[p.channel]?.shows?.[0] && byId[byId[p.channel].shows[0]]?.name) || 'Unassigned'; m[k] = (m[k]||0) + (p.views||0); });
+  const rows = Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  line('cShows', {type:'bar', data:{labels: rows.map(r=>r[0]), datasets:[{data: rows.map(r=>r[1]), backgroundColor:accent, borderRadius:4, barThickness:14}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${full(c.parsed.x)} views`}}}, scales:{x:{ticks:{callback:fmt}}, y:{grid:{display:false}}}}});
+}
+
+// ── tables ─────────────────────────────────────────────────────────────
+function table(id, cols, rows, defaultSort){
+  const key = id; const s = state.sort[key] || defaultSort;
+  const sorted = [...rows].sort((a,b) => { const x=a[s.k], y=b[s.k]; if (x==null && y==null) return 0; if (x==null) return 1; if (y==null) return -1; return typeof x==='number' ? (s.d==='desc'?y-x:x-y) : (s.d==='desc'?String(y).localeCompare(String(x)):String(x).localeCompare(String(y))); });
+  const el = $('#'+id);
+  el.innerHTML = '<thead><tr>' + cols.map(c=>`<th class="${c.n?'n':''} ${s.k===c.k?'sorted':''}" data-k="${c.k}">${c.h}</th>`).join('') + '</tr></thead><tbody>' +
+    (sorted.length ? sorted.map(r => '<tr>' + cols.map(c=>`<td class="${c.n?'n':''} ${c.t?'t':''}">${c.f ? c.f(r) : (c.n ? full(r[c.k]) : esc(r[c.k]))}</td>`).join('') + '</tr>').join('') : `<tr><td colspan="${cols.length}" class="empty">Nothing in this selection</td></tr>`) + '</tbody>';
+  el.querySelector('thead').onclick = e => { const th = e.target.closest('th'); if (!th) return; const k = th.dataset.k; const cur = state.sort[key] || defaultSort; state.sort[key] = {k, d: cur.k===k && cur.d==='desc' ? 'asc' : 'desc'}; table(id, cols, rows, defaultSort); };
+}
+const pill = p => `<span class="pill" style="--c:${PCOLORS[p]||'#999'}">${esc(p)}</span>`;
+function renderAccounts({start,end,posts}, series){
+  const rows = []; const pv = {}; posts.forEach(p => { if (!p.channel) return; const k=p.channel+'|'+p.platform; (pv[k] = pv[k] || {n:0,v:0}); pv[k].n++; pv[k].v += p.views||0; });
+  const keys = new Set([...series.keys(), ...Object.keys(pv)]);
+  keys.forEach(k => { const [ch, p] = k.split('|'); const c = byId[ch]; if (!channelOk(c) || !state.platforms.has(p)) return; const arr = series.get(k) || [];
+    const now = arr.length ? valueAt(arr, end) : (c.followers[p] ?? null);
+    const d7 = arr.length>1 ? valueAt(arr, addDays(end,-7)) : null, d30 = arr.length>1 ? valueAt(arr, addDays(end,-30)) : null;
+    const t = arr.length>1 ? (valueAt(arr, addDays(start,-1)) ?? firstOnOrAfter(arr, start)) : null;
+    rows.push({account:c.name, photo:c.photo, platform:p, now, c7: d7!=null&&now!=null ? now-d7 : null, c30: d30!=null&&now!=null ? now-d30 : null, cr: t!=null&&now!=null ? now-t : null, pr: t ? pct(now,t) : null, posts: pv[k]?.n||0, views: pv[k]?.v||0, url: c.profiles[p]}); });
+  table('tAccounts', [
+    {h:'Account', k:'account', f: r => `<img class="avatar" src="${esc(r.photo||'')}" onerror="this.style.visibility='hidden'">${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.account)}</a>`:esc(r.account)}`},
+    {h:'Platform', k:'platform', f: r => pill(r.platform)},
+    {h:'Followers', k:'now', n:true}, {h:'7d', k:'c7', n:true, f: r => deltaHtml(r.c7)}, {h:'30d', k:'c30', n:true, f: r => deltaHtml(r.c30)},
+    {h:'In range', k:'cr', n:true, f: r => deltaHtml(r.cr, r.pr)}, {h:'Posts', k:'posts', n:true}, {h:'Views', k:'views', n:true},
+  ], rows, {k:'now', d:'desc'});
+}
+function renderEditors(posts){
+  const m = {}; posts.forEach(p => { const e = p.editor || 'Unassigned'; const r = m[e] = m[e] || {editor:e, posts:0, views:0, likes:0, top:0, topTitle:'', vs:[]}; r.posts++; r.views += p.views||0; r.likes += p.likes||0; r.vs.push(p.views||0); if ((p.views||0) > r.top) { r.top = p.views||0; r.topTitle = p.title || p.hook; } });
+  const rows = Object.values(m).map(r => ({...r, avg: r.posts ? r.views/r.posts : null, med: median(r.vs)}));
+  table('tEditors', [{h:'Editor', k:'editor'}, {h:'Posts', k:'posts', n:true}, {h:'Views', k:'views', n:true}, {h:'Avg', k:'avg', n:true}, {h:'Median', k:'med', n:true}, {h:'Best post', k:'top', n:true, f: r => `<span title="${esc(r.topTitle)}">${full(r.top)}</span>`}], rows, {k:'views', d:'desc'});
+}
+function renderTop(posts){
+  const rows = [...posts].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,40).map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
+  table('tTop', [{h:'Post', k:'title', t:true, f: r => r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.title)}">${esc(r.title)}</a>` : esc(r.title)}, {h:'Account', k:'account'}, {h:'Platform', k:'platform', f: r => pill(r.platform)}, {h:'Editor', k:'editor'}, {h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Likes', k:'likes', n:true}, {h:'Comments', k:'comments', n:true}], rows, {k:'views', d:'desc'});
+}
+
+load();
+})();
+</script>
+</body>
+</html>

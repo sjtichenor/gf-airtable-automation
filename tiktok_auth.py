@@ -90,6 +90,18 @@ STATE_TTL = 600
 
 app = FastAPI(title="Good Future Media API", docs_url=None, redoc_url=None)
 
+# Analytics dashboard: /dashboard (see dashboard/README in OPERATIONS.md).
+from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
+from dashboard.routes import router as dashboard_router, start_background  # noqa: E402
+
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.include_router(dashboard_router)
+
+
+@app.on_event("startup")
+def _warm_dashboard() -> None:
+    start_background()
+
 
 def missing_config() -> List[str]:
     wanted = {
