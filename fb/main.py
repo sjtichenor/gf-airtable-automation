@@ -802,14 +802,19 @@ class FacebookSync:
     def get_page_access_token_for_post(self, post_id, page_identifier=None):
         """Get the correct page access token for a post"""
         # If we have a page identifier, try to use it
+        # Remember which page the token belongs to; the probe needs the page id
+        # to address the Page-post object ({page_id}_{post_id}).
+        self._probe_page_id = None
         if page_identifier:
             # Check if it's a direct page ID
             if page_identifier in self.page_id_to_token:
+                self._probe_page_id = page_identifier
                 return self.page_id_to_token[page_identifier]
             
             # Check if it's a page name that maps to our configured pages
             for page in self.facebook_pages:
                 if page.get('page_name', '').lower().replace(' ', '') == page_identifier.lower().replace(' ', ''):
+                    self._probe_page_id = page.get('page_id')
                     return page.get('page_access_token')
         
         # If no specific page identified, try each page token until one works
@@ -817,6 +822,7 @@ class FacebookSync:
         for page in self.facebook_pages:
             token = page.get('page_access_token')
             if token and self.test_post_access(post_id, token):
+                self._probe_page_id = page.get('page_id')
                 return token
         
         return None
@@ -1120,22 +1126,23 @@ class FacebookSync:
                 ("video node fields", f"{base}/{post_id}", {'fields': 'id,title,length,views,created_time,from,status'}),
                 ("post insights edge", f"{base}/{post_id}/insights", {'metric': 'post_impressions_unique,post_video_views'}),
             ]
+            # Post-level metrics live on the Page-post object, not the video.
+            # Ask for each alone, then all together.
+            post_metrics = ['post_impressions_unique', 'post_video_avg_time_watched', 'post_video_view_time',
+                            'post_video_followers', 'post_video_social_actions', 'post_video_retention_graph',
+                            'post_video_views', 'post_reactions_by_type_total', 'post_clicks']
             if page_id:
-                variants.append(("page-scoped post insights", f"{base}/{page_id}_{post_id}/insights", {'metric': 'post_impressions_unique,post_video_views'}))
-            # The seven Reels metrics we want to add: each alone, then together in
-            # groups, to learn which can share one request. One poison metric
-            # (post_video_likes_by_reaction_type) blanks a whole request, so this
-            # is how we find any others before trusting a combined call.
-            reels = ['post_impressions_unique', 'post_video_avg_time_watched', 'post_video_view_time',
-                     'fb_reels_replay_count', 'post_video_followers', 'post_video_social_actions',
-                     'post_video_retention_graph']
-            for m in reels:
+                pp = f"{base}/{page_id}_{post_id}/insights"
+                for m in post_metrics:
+                    variants.append((f"post metric {m}", pp, {'metric': m}))
+                variants.append(("post metrics together", pp, {'metric': ','.join(post_metrics)}))
+                variants.append(("post node fields", f"{base}/{page_id}_{post_id}",
+                                 {'fields': 'id,created_time,shares,reactions.summary(true),comments.summary(true)'}))
+            else:
+                print("   (no page id captured; post-edge variants skipped)")
+            # Video-edge Reels metrics, each alone (grouping blanks the response).
+            for m in ['fb_reels_replay_count', 'blue_reels_play_count', 'fb_reels_total_plays']:
                 variants.append((f"reel metric {m}", f"{base}/{post_id}/video_insights", {'metric': m}))
-            variants.append(("all seven together", f"{base}/{post_id}/video_insights", {'metric': ','.join(reels)}))
-            variants.append(("plays + reach + watch time", f"{base}/{post_id}/video_insights",
-                             {'metric': 'fb_reels_total_plays,post_impressions_unique,post_video_avg_time_watched,post_video_view_time'}))
-            variants.append(("replays + followers + social", f"{base}/{post_id}/video_insights",
-                             {'metric': 'fb_reels_replay_count,post_video_followers,post_video_social_actions'}))
             print(f"🧪 PROBE for {post_id} via {base}")
             for label, url, params in variants:
                 try:
