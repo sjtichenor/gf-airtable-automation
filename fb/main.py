@@ -845,91 +845,54 @@ class FacebookSync:
     def get_facebook_post_metrics(self, post_id, access_token):
         """Get Facebook post metrics (views and likes)"""
         try:
-            print(f"      🔍 Fetching Facebook metrics for post: {post_id}")
-            
-            # Get video insights (views)
-            insights_url = f"{self.facebook_base_url}/{post_id}/video_insights"
-            insights_params = {
-                'access_token': access_token,
-                'metric': 'post_video_likes_by_reaction_type,fb_reels_total_plays'
-            }
-            
-            insights_response = requests.get(insights_url, params=insights_params)
-            print(f"      📡 Video insights API response status: {insights_response.status_code}")
-            
-            views = None  # unknown until the insights call succeeds; never written as 0
-            likes = None  # likewise: only written once some call actually returned it
+            print(f"      Fetching Facebook metrics for post: {post_id}")
+
+            # One request per post: the video node carries plays, likes and the
+            # publish time. The old two-metric video_insights call
+            # (post_video_likes_by_reaction_type + fb_reels_total_plays) makes
+            # Meta answer {"data": []} for the whole request; the reaction
+            # metric is the poison pill. Probed 2026-09-09: `views` here equals
+            # fb_reels_total_plays exactly (17,357 on the test reel).
+            views = None
+            likes = None
             date_posted = None
-            
-            if insights_response.status_code == 200:
-                insights_data = insights_response.json()
-                if os.getenv('FB_MAX_POSTS'):
-                    # Test runs: show exactly what Meta returned (bodies never contain the token).
-                    print(f"      insights body: {insights_response.text[:400]}")
-                if not insights_data.get('data'):
-                    # 200 with no metrics is not "zero"; it is "nothing usable".
-                    print(f"      Video insights returned 200 but no data: {insights_response.text[:300]}")
-                
-                for insight in insights_data.get('data', []):
-                    metric_name = insight.get('name')
-                    values = insight.get('values', [])
-                    
-                    if metric_name == 'fb_reels_total_plays' and values:
-                        views = values[0].get('value', 0)
-                    elif metric_name == 'post_video_likes_by_reaction_type' and values:
-                        # Sum all reaction types for total likes
-                        reactions = values[0].get('value', {})
-                        likes = sum(reactions.values()) if isinstance(reactions, dict) else 0
-                if views is None:
-                    print("      ⚠️ Insights returned no play count; leaving Views unchanged")
+
+            node = requests.get(
+                f"{self.facebook_base_url}/{post_id}",
+                params={'access_token': access_token,
+                        'fields': 'views,likes.summary(true),created_time'},
+                timeout=30,
+            )
+            print(f"      Video node response status: {node.status_code}")
+            if node.status_code == 200:
+                data = node.json()
+                views = data.get('views')
+                likes = data.get('likes', {}).get('summary', {}).get('total_count')
+                if data.get('created_time'):
+                    date_posted = self.format_facebook_date(data['created_time'])
             else:
-                print(f"      ⚠️ Video insights failed: {insights_response.status_code} {insights_response.text[:300]}")
-                # Try to get basic post info as fallback
-                post_url = f"{self.facebook_base_url}/{post_id}"
-                post_params = {
-                    'access_token': access_token,
-                    'fields': 'likes.summary(true),created_time'
-                }
-                
-                post_response = requests.get(post_url, params=post_params)
-                if post_response.status_code == 200:
-                    post_data = post_response.json()
-                    likes = post_data.get('likes', {}).get('summary', {}).get('total_count', 0)
-                    created_time = post_data.get('created_time')
-                    if created_time:
-                        date_posted = self.format_facebook_date(created_time)
-                else:
-                    # Both calls failed (rate limit, dead token, missing permission).
-                    # We know nothing about this post; do not write zeros for it.
-                    print(f"      ⚠️ Fallback also failed ({post_response.status_code}); skipping this post")
-                    return None
-            
-            # Try to get creation date if we don't have it
-            if not date_posted:
-                post_url = f"{self.facebook_base_url}/{post_id}"
-                post_params = {
-                    'access_token': access_token,
-                    'fields': 'created_time'
-                }
-                
-                post_response = requests.get(post_url, params=post_params)
-                if post_response.status_code == 200:
-                    post_data = post_response.json()
-                    created_time = post_data.get('created_time')
-                    if created_time:
-                        date_posted = self.format_facebook_date(created_time)
-            
-            if likes is None:
-                # Insights gave no reaction metric; read the plain like count.
-                post_response = requests.get(
-                    f"{self.facebook_base_url}/{post_id}",
-                    params={'access_token': access_token, 'fields': 'likes.summary(true)'},
+                print(f"      Video node failed: {node.status_code} {node.text[:300]}")
+
+            if views is None:
+                # Fallback: the one insights metric that answers on its own.
+                ins = requests.get(
+                    f"{self.facebook_base_url}/{post_id}/video_insights",
+                    params={'access_token': access_token, 'metric': 'fb_reels_total_plays'},
+                    timeout=30,
                 )
-                if post_response.status_code == 200:
-                    likes = post_response.json().get('likes', {}).get('summary', {}).get('total_count')
-                if likes is None:
-                    print("      ⚠️ No like count obtainable; skipping this post")
-                    return None
+                print(f"      video_insights fb_reels_total_plays status: {ins.status_code}")
+                if ins.status_code == 200:
+                    for insight in ins.json().get('data', []):
+                        vals = insight.get('values') or []
+                        if insight.get('name') == 'fb_reels_total_plays' and vals:
+                            views = vals[0].get('value')
+                if views is None:
+                    print("      No play count obtainable; leaving Views unchanged")
+
+            if likes is None:
+                # Nothing usable came back at all; do not write for this post.
+                print("      No like count obtainable; skipping this post")
+                return None
 
             metrics = {
                 'views': views,
