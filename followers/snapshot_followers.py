@@ -36,7 +36,7 @@ PLATFORM_FIELDS = {
     "Facebook Followers": "Facebook",
     "Threads Followers": "Threads",
 }
-CHANNEL_NAME = "Channel Name"
+CHANNEL_NAME = "Social Media Account"  # the Channels primary field
 
 # Follower Logs fields (by name; the table was built by hand in the UI).
 F_PLATFORM = "Platform"
