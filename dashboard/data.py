@@ -22,6 +22,9 @@ BASE = os.environ.get("AIRTABLE_BASE_ID", "appxCYu0Tfwc6h7X7")
 TOKEN = os.environ.get("AIRTABLE_PERSONAL_ACCESS_TOKEN", "")
 REFRESH_SECONDS = int(os.environ.get("DASHBOARD_REFRESH_SECONDS", "900"))
 FAKE = os.environ.get("DASHBOARD_FAKE_DATA") == "1"
+# Channels with Status "Inactive" are ideas and past experiments; keep them
+# off the dashboard unless explicitly asked for.
+INCLUDE_INACTIVE = os.environ.get("DASHBOARD_INCLUDE_INACTIVE") == "1"
 API = "https://api.airtable.com/v0"
 
 TABLES = {
@@ -232,6 +235,9 @@ def build_snapshot() -> dict:
     for r in fetch_table(TABLES["channels"], _flatten([CH["name"], CH["owned"], CH["shows"], CH["status"], CH["photo"], CH["profiles"], CH["followers"]])):
         f = r["fields"]
         status = f.get(CH["status"])
+        status_name = status.get("name") if isinstance(status, dict) else status
+        if status_name == "Inactive" and not INCLUDE_INACTIVE:
+            continue
         channels[r["id"]] = {
             "id": r["id"],
             "name": f.get(CH["name"]) or "?",
@@ -271,6 +277,8 @@ def build_snapshot() -> dict:
         f = r["fields"]
         vid = videos.get(_first(f.get(PO["video"])) or "", {})
         ch = _first(f.get(PO["channel"]))
+        if ch and ch not in channels:
+            continue  # posted to an inactive channel
         posts.append({
             "id": r["id"],
             "url": f.get(PO["url"]),
@@ -297,7 +305,7 @@ def build_snapshot() -> dict:
     for r in fetch_table(TABLES["followers"], _flatten(FL.values())):
         f = r["fields"]
         ch = _first(f.get(FL["channel"]))
-        if not ch or f.get(FL["count"]) is None or not f.get(FL["date"]):
+        if not ch or ch not in channels or f.get(FL["count"]) is None or not f.get(FL["date"]):
             continue
         followers.append({
             "channel": ch,
@@ -323,6 +331,13 @@ def build_snapshot() -> dict:
             "start": f.get(SL["start"]),
             "end": f.get(SL["end"]),
         })
+
+    # Shows worth listing: linked to an active channel, or named on a kept post.
+    used_show_ids = {sid for c in channels.values() for sid in c["shows"]}
+    used_show_names = {p["show"] for p in posts if p["show"]}
+    shows = {sid: sh for sid, sh in shows.items() if sid in used_show_ids or sh["name"] in used_show_names}
+    for c in channels.values():
+        c["shows"] = [sid for sid in c["shows"] if sid in shows]
 
     return {
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
