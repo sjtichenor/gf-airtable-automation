@@ -865,8 +865,7 @@ class FacebookSync:
                 insights_data = insights_response.json()
                 if not insights_data.get('data'):
                     # 200 with no metrics is not "zero"; it is "nothing usable".
-                    print("      ⚠️ Video insights returned 200 but no data; treating as failed")
-                    insights_response.status_code = 0
+                    print(f"      Video insights returned 200 but no data: {insights_response.text[:300]}")
                 
                 for insight in insights_data.get('data', []):
                     metric_name = insight.get('name')
@@ -881,7 +880,7 @@ class FacebookSync:
                 if views is None:
                     print("      ⚠️ Insights returned no play count; leaving Views unchanged")
             else:
-                print(f"      ⚠️ Video insights failed: {insights_response.status_code}")
+                print(f"      ⚠️ Video insights failed: {insights_response.status_code} {insights_response.text[:300]}")
                 # Try to get basic post info as fallback
                 post_url = f"{self.facebook_base_url}/{post_id}"
                 post_params = {
@@ -1190,6 +1189,14 @@ class FacebookSync:
             
             if social_network == 'Facebook' and post_url:
                 facebook_posts.append(post)
+        
+        max_posts = int(os.getenv('FB_MAX_POSTS', '0') or 0)
+        
+        if max_posts > 0:
+        
+            facebook_posts = facebook_posts[:max_posts]
+        
+            print(f"FB_MAX_POSTS={max_posts}: limiting this run to the first {len(facebook_posts)} post(s)")
         
         print(f"🎯 Processing {len(facebook_posts)} Facebook posts")
         
