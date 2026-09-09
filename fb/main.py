@@ -863,6 +863,9 @@ class FacebookSync:
             
             if insights_response.status_code == 200:
                 insights_data = insights_response.json()
+                if os.getenv('FB_MAX_POSTS'):
+                    # Test runs: show exactly what Meta returned (bodies never contain the token).
+                    print(f"      insights body: {insights_response.text[:400]}")
                 if not insights_data.get('data'):
                     # 200 with no metrics is not "zero"; it is "nothing usable".
                     print(f"      Video insights returned 200 but no data: {insights_response.text[:300]}")
