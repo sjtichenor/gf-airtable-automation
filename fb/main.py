@@ -676,6 +676,12 @@ class FacebookSync:
         
         # Load Facebook pages from environment
         facebook_pages_json = os.getenv('FACEBOOK_PAGES', '[]')
+        # Say what we were given without revealing it: unset vs blank vs shape.
+        if 'FACEBOOK_PAGES' not in os.environ:
+            print("⚠️ FACEBOOK_PAGES is not set on this service")
+        else:
+            _raw = os.environ['FACEBOOK_PAGES']
+            print(f"ℹ️ FACEBOOK_PAGES is set: {len(_raw)} chars, starts with {_raw.strip()[:2]!r}, {_raw.count(chr(10))} line break(s)")
         try:
             # Take the first JSON document and tolerate anything pasted after it
             # (a stray newline or shell prompt). A strict json.loads rejected the
