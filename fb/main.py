@@ -1144,6 +1144,30 @@ class FacebookSync:
         print(f"   🔗 Using page access token")
         
         # Get post metrics
+        if os.getenv('FB_PROBE'):
+            # Diagnostic only: ask Meta about this one object several ways, print
+            # every body (bodies never contain the token), write nothing, stop.
+            base = self.facebook_base_url
+            page_id = getattr(self, '_probe_page_id', None)
+            variants = [
+                ("video_insights, no metric filter", f"{base}/{post_id}/video_insights", {}),
+                ("video_insights fb_reels_total_plays", f"{base}/{post_id}/video_insights", {'metric': 'fb_reels_total_plays'}),
+                ("video_insights total_video_views", f"{base}/{post_id}/video_insights", {'metric': 'total_video_views'}),
+                ("video_insights blue_reels_play_count", f"{base}/{post_id}/video_insights", {'metric': 'blue_reels_play_count'}),
+                ("video node fields", f"{base}/{post_id}", {'fields': 'id,title,length,views,created_time,from,status'}),
+                ("post insights edge", f"{base}/{post_id}/insights", {'metric': 'post_impressions_unique,post_video_views'}),
+            ]
+            if page_id:
+                variants.append(("page-scoped post insights", f"{base}/{page_id}_{post_id}/insights", {'metric': 'post_impressions_unique,post_video_views'}))
+            print(f"🧪 PROBE for {post_id} via {base}")
+            for label, url, params in variants:
+                try:
+                    r = requests.get(url, params={**params, 'access_token': access_token}, timeout=30)
+                    print(f"   [{r.status_code}] {label}: {r.text[:400]}")
+                except Exception as exc:
+                    print(f"   [ERR] {label}: {exc}")
+            print("🧪 PROBE done; exiting without writing")
+            raise SystemExit(0)
         metrics = self.get_facebook_post_metrics(post_id, access_token)
         
         if metrics:
