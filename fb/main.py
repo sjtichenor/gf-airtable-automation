@@ -861,23 +861,49 @@ class FacebookSync:
             # fb_reels_total_plays exactly (17,357 on the test reel).
             views = None
             likes = None
+            comments = None
+            replays = None
             date_posted = None
 
-            node = requests.get(
-                f"{self.facebook_base_url}/{post_id}",
-                params={'access_token': access_token,
-                        'fields': 'views,likes.summary(true),created_time'},
-                timeout=30,
-            )
-            print(f"      Video node response status: {node.status_code}")
-            if node.status_code == 200:
-                data = node.json()
-                views = data.get('views')
-                likes = data.get('likes', {}).get('summary', {}).get('total_count')
-                if data.get('created_time'):
-                    date_posted = self.format_facebook_date(data['created_time'])
-            else:
+            # comments.summary(true) is asked for in the same call; if Meta
+            # rejects the field for this object, ask again without it rather
+            # than lose views and likes.
+            field_sets = ['views,likes.summary(true),comments.summary(true),created_time',
+                          'views,likes.summary(true),created_time']
+            for fields_param in field_sets:
+                node = requests.get(
+                    f"{self.facebook_base_url}/{post_id}",
+                    params={'access_token': access_token, 'fields': fields_param},
+                    timeout=30,
+                )
+                print(f"      Video node response status: {node.status_code}")
+                if node.status_code == 200:
+                    data = node.json()
+                    views = data.get('views')
+                    likes = data.get('likes', {}).get('summary', {}).get('total_count')
+                    comments = data.get('comments', {}).get('summary', {}).get('total_count')
+                    if data.get('created_time'):
+                        date_posted = self.format_facebook_date(data['created_time'])
+                    break
                 print(f"      Video node failed: {node.status_code} {node.text[:300]}")
+
+            # Replays answer only on their own on the video_insights edge
+            # (probed 2026-09-09: any grouping blanks the response).
+            try:
+                rep = requests.get(
+                    f"{self.facebook_base_url}/{post_id}/video_insights",
+                    params={'access_token': access_token, 'metric': 'fb_reels_replay_count'},
+                    timeout=30,
+                )
+                if rep.status_code == 200:
+                    for insight in rep.json().get('data', []):
+                        vals = insight.get('values') or []
+                        if insight.get('name') == 'fb_reels_replay_count' and vals:
+                            replays = vals[0].get('value')
+                else:
+                    print(f"      video_insights fb_reels_replay_count status: {rep.status_code}")
+            except Exception as exc:
+                print(f"      Replay count request failed: {exc}")
 
             if views is None:
                 # Fallback: the one insights metric that answers on its own.
@@ -903,10 +929,12 @@ class FacebookSync:
             metrics = {
                 'views': views,
                 'likes': likes,
+                'comments': comments,
+                'replays': replays,
                 'date_posted': date_posted
             }
             
-            print(f"      ✅ Facebook metrics retrieved: Views={views}, Likes={likes}, Date={date_posted}")
+            print(f"      ✅ Facebook metrics retrieved: Views={views}, Likes={likes}, Comments={comments}, Replays={replays}, Date={date_posted}")
             return metrics
             
         except Exception as e:
@@ -1007,6 +1035,10 @@ class FacebookSync:
             update_fields = {'Likes': metrics['likes']}
             if metrics.get('views') is not None:
                 update_fields['Views'] = metrics['views']
+            if metrics.get('comments') is not None:
+                update_fields['Comments'] = metrics['comments']
+            if metrics.get('replays') is not None:
+                update_fields['Replays'] = metrics['replays']
             
             # Handle Date Posted logic
             date_action = "none"
@@ -1147,7 +1179,9 @@ class FacebookSync:
             for label, url, params in variants:
                 try:
                     r = requests.get(url, params={**params, 'access_token': access_token}, timeout=30)
-                    print(f"   [{r.status_code}] {label}: {r.text[:900]}")
+                    # Paging URLs echo the access token; never let it reach the logs.
+                    body = re.sub(r'access_token=[^&"\\]+', 'access_token=REDACTED', r.text)
+                    print(f"   [{r.status_code}] {label}: {body[:900]}")
                 except Exception as exc:
                     print(f"   [ERR] {label}: {exc}")
             print("🧪 PROBE done; exiting without writing")
