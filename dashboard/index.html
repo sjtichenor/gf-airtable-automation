@@ -27,6 +27,7 @@ header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85
 .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed)}
 .brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
 .spacer{flex:1}
+.nav{display:flex;gap:4px;margin-left:8px}.nav a{padding:6px 10px;border-radius:8px;color:var(--muted);font-weight:500}.nav a.on{background:var(--chip);color:var(--text)}
 .meta{color:var(--muted);font-size:12px;display:flex;gap:14px;align-items:center}
 button.ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
 button.ghost:hover{border-color:var(--muted2)}
@@ -73,6 +74,7 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 <div id="overlay"><div><b>Loading analytics</b><span id="ovmsg">Fetching the latest snapshot…</span></div></div>
 <header><div class="bar">
   <div class="brand"><span class="dot"></span>Good Future Media<span class="sub">Analytics</span></div>
+  <nav class="nav"><a class="on" href="/dashboard">Overview</a><a href="/dashboard/team">Team</a></nav>
   <div class="spacer"></div>
   <div class="meta"><span id="stamp"></span>
     <button class="ghost" id="refresh" title="Pull fresh numbers from Airtable now">Refresh data</button>

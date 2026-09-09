@@ -7,7 +7,7 @@ from urllib.parse import parse_qs
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from . import auth
+from . import activity, auth, slack
 from .data import cache
 
 router = APIRouter(prefix="/dashboard")
@@ -106,5 +106,82 @@ def refresh(request: Request):
     return JSONResponse({"started": True})
 
 
+@router.get("/team", response_class=HTMLResponse)
+def team_page(request: Request):
+    if not auth.is_authed(request):
+        return RedirectResponse("/dashboard/login", status_code=303)
+    return HTMLResponse(_read("team.html"))
+
+
+@router.get("/api/activity")
+def api_activity(request: Request, days: int = 90):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if cache.snapshot is None:
+        return JSONResponse({"error": "warming up", **cache.status()}, status_code=503, headers={"Retry-After": "5"})
+    return JSONResponse(activity.summary(cache.snapshot, max(7, min(days, 180))), headers={"Cache-Control": "private, max-age=60"})
+
+
+def _window(date: str = "", to: str = ""):
+    from datetime import date as _d
+    if date:
+        a = _d.fromisoformat(date)
+        b = _d.fromisoformat(to) if to else a
+        return a, b
+    return activity.digest_window()
+
+
+@router.get("/api/digest")
+def api_digest(request: Request, date: str = "", to: str = ""):
+    """Preview the Slack digest as text + blocks. No date → what this
+    morning's report would cover."""
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if cache.snapshot is None:
+        return JSONResponse({"error": "warming up", **cache.status()}, status_code=503)
+    a, b = _window(date, to)
+    d = activity.digest(cache.snapshot, a, b)
+    d["slack_configured"] = slack.configured()
+    d["recipients"] = slack.recipient_ids(cache.snapshot)
+    return JSONResponse(d)
+
+
+@router.post("/api/digest/send")
+def api_digest_send(request: Request, date: str = "", to: str = ""):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if cache.snapshot is None:
+        return JSONResponse({"error": "warming up"}, status_code=503)
+    a, b = _window(date, to)
+    try:
+        channel = slack.send(cache.snapshot, activity.digest(cache.snapshot, a, b))
+    except Exception as exc:
+        return JSONResponse({"sent": False, "error": str(exc)}, status_code=500)
+    return JSONResponse({"sent": True, "channel": channel, "from": a.isoformat(), "to": b.isoformat()})
+
+
+_digest_state = {"last_sent": None}
+
+
+def _digest_loop() -> None:
+    import logging
+    import time as _t
+    log = logging.getLogger("dashboard.digest")
+    while True:
+        try:
+            now = activity.today_local()
+            due = (slack.configured() and cache.snapshot is not None and now.hour == slack.HOUR and now.minute < 10
+                   and (now.weekday() + 1) in slack.DAYS and _digest_state["last_sent"] != now.date().isoformat())
+            if due:
+                _digest_state["last_sent"] = now.date().isoformat()
+                a, b = activity.digest_window(now.date())
+                slack.send(cache.snapshot, activity.digest(cache.snapshot, a, b))
+        except Exception:
+            log.exception("daily digest failed")
+        _t.sleep(60)
+
+
 def start_background() -> None:
     cache.start()
+    import threading
+    threading.Thread(target=_digest_loop, name="dashboard-digest", daemon=True).start()

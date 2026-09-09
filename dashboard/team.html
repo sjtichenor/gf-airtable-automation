@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Good Future Media · Team activity</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --border:#e5e8ee; --text:#0f172a; --muted:#64748b; --muted2:#94a3b8;
+  --accent:#2563eb; --accent-soft:#dbeafe; --up:#16a34a; --down:#dc2626; --warn:#d97706; --chip:#eef2f7; --chip-on:#0f172a; --chip-on-text:#fff;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12); --grid:#eef1f5; --cell:#e9edf3;
+}
+html[data-theme=dark]{
+  --bg:#0b0e14; --card:#121722; --border:#1f2734; --text:#e6e9ef; --muted:#8b95a7; --muted2:#5b6577;
+  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --warn:#fbbf24; --chip:#1a2130; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#1c2431; --cell:#1a2130;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.bar{max-width:1440px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em;font-size:16px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed)}
+.brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
+.nav{display:flex;gap:4px;margin-left:8px}.nav a{padding:6px 10px;border-radius:8px;color:var(--muted);font-weight:500}.nav a.on{background:var(--chip);color:var(--text)}
+.spacer{flex:1}
+.meta{color:var(--muted);font-size:12px;display:flex;gap:14px;align-items:center}
+button.ghost,a.ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
+main{max-width:1440px;margin:0 auto;padding:20px 24px 60px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.filters select,.filters input[type=date]{appearance:none;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font:inherit;font-size:13px;box-shadow:var(--shadow)}
+.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
+h2{font-size:15px;margin:26px 0 10px;font-weight:700}
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
+.who{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:14px;object-fit:cover;flex:none}
+.who .n{font-weight:700;font-size:14px}.who .r{font-size:12px;color:var(--muted)}
+.badge{margin-left:auto;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.badge.quiet{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
+.badge.today{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.stats{display:flex;gap:18px;margin:8px 0 12px;flex-wrap:wrap}
+.stat .v{font-size:18px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.stat .l{font-size:11px;color:var(--muted)}
+.heat{display:flex;gap:3px;overflow:hidden}
+.heat .col{display:flex;flex-direction:column;gap:3px}
+.heat .c{width:11px;height:11px;border-radius:2px;background:var(--cell);cursor:pointer}
+.heat .c.l1{background:color-mix(in srgb,var(--accent) 30%,var(--cell))}.heat .c.l2{background:color-mix(in srgb,var(--accent) 55%,var(--cell))}.heat .c.l3{background:color-mix(in srgb,var(--accent) 80%,var(--cell))}.heat .c.l4{background:var(--accent)}
+.heat .c.sel{outline:2px solid var(--warn);outline-offset:1px}
+.heat .c.future{opacity:.25}
+.months{display:flex;font-size:10px;color:var(--muted2);margin-bottom:4px;height:12px;position:relative}
+.wip{margin-top:10px;font-size:12px;color:var(--muted)}
+.wip b{color:var(--text);font-weight:600}
+.ev{display:grid;grid-template-columns:52px 130px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:baseline}
+.ev .t{color:var(--muted);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--chip);color:var(--text)}
+.pill.finished,.pill.approved,.pill.posted{background:color-mix(in srgb,var(--up) 18%,transparent);color:var(--up)}
+.pill.sent_back,.pill.dropped{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
+.pill.started,.pill.picked_up,.pill.revision_started,.pill.created{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.ev .d{color:var(--muted);font-size:12px}
+.ev .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.span12{grid-column:span 12}.span6{grid-column:span 6}.span4{grid-column:span 4}
+@media(max-width:1000px){.span6,.span4{grid-column:span 12}}
+.pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.pipe .k{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.pipe .k .v{font-size:22px;font-weight:800}.pipe .k .l{font-size:12px;color:var(--muted)}.pipe .k .s{font-size:11px;color:var(--down);margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);padding:24px;text-align:center}
+#overlay{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:20;font-size:15px;color:var(--muted);text-align:center;padding:20px}
+#overlay b{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
+.person-h{font-weight:700;margin:14px 0 4px;display:flex;gap:10px;align-items:baseline}.person-h span{font-weight:400;color:var(--muted);font-size:12px}
+.digest{white-space:pre-wrap;font-size:13px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="overlay"><div><b>Loading team activity</b><span id="ovmsg">Deriving events from status history…</span></div></div>
+<header><div class="bar">
+  <div class="brand"><span class="dot"></span>Good Future Media<span class="sub">Analytics</span></div>
+  <nav class="nav"><a href="/dashboard">Overview</a><a class="on" href="/dashboard/team">Team</a></nav>
+  <div class="spacer"></div>
+  <div class="meta"><span id="stamp"></span><button class="ghost" id="theme">Dark</button><a class="ghost" href="/dashboard/logout">Sign out</a></div>
+</div></header>
+<main>
+  <div class="filters">
+    <select id="fDays"><option value="30">Last 30 days</option><option value="60">Last 60 days</option><option value="90" selected>Last 90 days</option><option value="120">Last 120 days</option></select>
+    <select id="fTeam"><option value="">All teams</option></select>
+    <select id="fRole"><option value="">All roles</option><option>Editor</option><option>Director</option><option>Social Media Manager</option><option>Bootcamp Recruit</option></select>
+    <label class="toggle"><input type="checkbox" id="fOthers"> Include people not in the Team table</label>
+    <span class="spacer"></span>
+    <label class="toggle">Day <input type="date" id="fDay"></label>
+  </div>
+
+  <div id="people" class="people"></div>
+
+  <h2 id="dayTitle">Day detail</h2>
+  <div class="card span12" id="day"></div>
+
+  <h2>Pipeline right now</h2>
+  <div class="pipe" id="pipe"></div>
+  <div class="card" style="margin-top:14px"><h3 style="margin:0 0 8px;font-size:13px">Stuck videos</h3><div style="overflow:auto"><table id="stuck"></table></div></div>
+
+  <h2>This morning's report <span style="font-weight:400;color:var(--muted);font-size:12px">what the Slack digest says</span></h2>
+  <div class="card"><div class="digest" id="digest">…</div><div id="digestMeta" style="margin-top:10px;font-size:12px;color:var(--muted)"></div></div>
+</main>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const iso = d => d.toISOString().slice(0,10);
+const addDays = (s, n) => { const d = new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return iso(d); };
+const dow = s => (new Date(s+'T00:00:00Z').getUTCDay()+6)%7; // Mon=0
+const nice = s => new Date(s+'T00:00:00Z').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
+let A = null, state = {days:90, team:'', role:'', others:false, day:null};
+
+function applyTheme(t){ document.documentElement.dataset.theme=t; $('#theme').textContent = t==='dark'?'Light':'Dark'; try{localStorage.setItem('gf-theme',t)}catch(e){} }
+let theme='light'; try{ theme = localStorage.getItem('gf-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); }catch(e){}
+applyTheme(theme); $('#theme').onclick = () => applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+
+async function load(){
+  const r = await fetch('/dashboard/api/activity?days='+state.days, {credentials:'same-origin'});
+  if (r.status===401) { location.href='/dashboard/login'; return; }
+  if (r.status===503) { $('#ovmsg').textContent='Snapshot still warming up…'; setTimeout(load, 5000); return; }
+  A = await r.json();
+  if (!state.day || state.day > A.today) state.day = A.today;
+  $('#fDay').value = state.day; $('#fDay').max = A.today;
+  const teams = [...new Set(A.people.map(p=>p.team).filter(Boolean))].sort();
+  $('#fTeam').innerHTML = '<option value="">All teams</option>' + teams.map(t=>`<option ${t===state.team?'selected':''}>${esc(t)}</option>`).join('');
+  $('#overlay').style.display='none';
+  $('#stamp').textContent = `Days in ${A.tz} · ${A.events.length.toLocaleString()} actions in range`;
+  render(); loadDigest();
+}
+async function loadDigest(){
+  const r = await fetch('/dashboard/api/digest', {credentials:'same-origin'}); if (!r.ok) return;
+  const d = await r.json();
+  $('#digest').textContent = d.text.replace(/\*/g,'');
+  $('#digestMeta').textContent = d.slack_configured ? `Slack is configured; sends at the scheduled hour to ${d.recipients.length} recipient(s).` : 'Slack is not configured yet (SLACK_BOT_TOKEN), so this is preview only.';
+}
+$('#fDays').onchange = e => { state.days = +e.target.value; load(); };
+$('#fTeam').onchange = e => { state.team = e.target.value; render(); };
+$('#fRole').onchange = e => { state.role = e.target.value; render(); };
+$('#fOthers').onchange = e => { state.others = e.target.checked; render(); };
+$('#fDay').onchange = e => { state.day = e.target.value; render(); };
+
+function people(){
+  return A.people.filter(p => (state.others || p.in_team) && (!state.team || p.team===state.team) && (!state.role || p.roles.includes(state.role)));
+}
+function level(n){ return n===0?'':n<=2?'l1':n<=5?'l2':n<=12?'l3':'l4'; }
+function heat(p){
+  // weeks from the Monday on/before start to today
+  let d = A.start; d = addDays(d, -dow(d)); const cols = []; const months = [];
+  while (d <= A.today) { const col = []; for (let i=0;i<7;i++){ const day = addDays(d,i); const n = p.by_day[day]||0; const future = day > A.today || day < A.start;
+      col.push(`<div class="c ${future?'future':level(n)} ${day===state.day?'sel':''}" data-day="${day}" title="${nice(day)}: ${n} action${n===1?'':'s'}"></div>`); }
+    if (new Date(d+'T00:00:00Z').getUTCDate() <= 7) months.push(`<span style="position:absolute;left:${cols.length*14}px">${new Date(d+'T00:00:00Z').toLocaleDateString(undefined,{month:'short',timeZone:'UTC'})}</span>`);
+    cols.push(`<div class="col">${col.join('')}</div>`); d = addDays(d,7); }
+  return `<div class="months">${months.join('')}</div><div class="heat">${cols.join('')}</div>`;
+}
+function statsFor(p){
+  const t = p.totals; const r = p.roles;
+  const s = [];
+  if (r.includes('Editor') || r.includes('Bootcamp Recruit') || (!r.length && (t.finished||t.started))) s.push(['Finished', t.finished||0], ['Started', (t.started||0)+(t.picked_up||0)], ['Revisions', t.revision_started||0]);
+  if (r.includes('Director') || t.approved || t.sent_back) s.push(['Approved', t.approved||0], ['Sent back', t.sent_back||0]);
+  if (r.includes('Social Media Manager') || t.posted) s.push(['Posts', t.posted||0]);
+  if (t.created && !s.length) s.push(['Videos created', t.created]);
+  s.push(['Active days', p.active_days]);
+  return s.map(([l,v]) => `<div class="stat"><div class="v">${v.toLocaleString()}</div><div class="l">${l}</div></div>`).join('');
+}
+function render(){
+  const ps = people();
+  $('#people').innerHTML = ps.length ? ps.map(p => {
+    const initials = p.name.split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+    const av = p.photo ? `<img class="avatar" src="${esc(p.photo)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'avatar',textContent:'${initials}'}))">` : `<div class="avatar">${initials}</div>`;
+    const q = p.quiet_days; const badge = q==null ? '<span class="badge">no activity loaded</span>' : q===0 ? '<span class="badge today">active today</span>' : q>=2 ? `<span class="badge quiet">quiet ${q}d</span>` : `<span class="badge">last active yesterday</span>`;
+    const wip = p.in_progress.length ? `<div class="wip"><b>${p.in_progress.length} in progress:</b> ` + p.in_progress.slice(0,3).map(w => `${esc((w.title||'').slice(0,48))} <span>(${w.status}, ${w.days!=null?w.days.toFixed(0)+'d':'?'})</span>`).join(' · ') + (p.in_progress.length>3?` · +${p.in_progress.length-3} more`:'') + '</div>' : '';
+    return `<div class="card"><div class="who">${av}<div><div class="n">${esc(p.name)}</div><div class="r">${esc(p.roles.join(' · ') || 'No Team row')}${p.team?' · '+esc(p.team):''}</div></div>${badge}</div>
+      <div class="stats">${statsFor(p)}</div>${heat(p)}${wip}</div>`; }).join('') : '<div class="empty">Nobody matches these filters.</div>';
+  $('#people').querySelectorAll('.c[data-day]').forEach(c => c.onclick = () => { state.day = c.dataset.day; $('#fDay').value = state.day; render(); $('#dayTitle').scrollIntoView({behavior:'smooth'}); });
+  renderDay(); renderPipe();
+}
+function renderDay(){
+  const names = new Set(people().map(p=>p.name));
+  const evs = A.events.filter(e => e.date===state.day && (e.person ? names.has(e.person) : state.others));
+  $('#dayTitle').textContent = `Day detail · ${nice(state.day)}`;
+  if (!evs.length) { $('#day').innerHTML = '<div class="empty">No actions recorded on this day for the selected people.</div>'; return; }
+  const by = {}; evs.forEach(e => (by[e.person||'Unattributed'] = by[e.person||'Unattributed'] || []).push(e));
+  const kinds = {}; evs.forEach(e => kinds[e.kind] = (kinds[e.kind]||0)+1);
+  const summary = Object.entries(kinds).map(([k,n]) => `${n} ${A.kinds[k]||k}`).join(' · ');
+  $('#day').innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:6px">${Object.keys(by).length} people active · ${summary}</div>` +
+    Object.entries(by).sort((a,b)=>b[1].length-a[1].length).map(([name, list]) => {
+      const times = list.map(e=>e.time).sort();
+      return `<div class="person-h">${esc(name)} <span>${list.length} actions · ${times[0]}–${times[times.length-1]}</span></div>` +
+        list.sort((a,b)=>a.time.localeCompare(b.time)).map(e => `<div class="ev"><span class="t">${e.time}</span><span><span class="pill ${e.kind}">${esc(e.label)}</span></span><span class="title">${e.url?`<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>`:esc(e.title)} <span class="d">${esc(e.detail||'')}</span></span></div>`).join('');
+    }).join('');
+}
+function renderPipe(){
+  const P = A.pipeline; const order = ['Up For Grabs','Assigned','Editing','Needs More Edits','Internal Review','Client Review','Ready to Post'];
+  $('#pipe').innerHTML = order.map(st => `<div class="k"><div class="v">${P[st].count}</div><div class="l">${st}</div>${P[st].stuck.length?`<div class="s">${P[st].stuck.length} stuck</div>`:''}</div>`).join('');
+  const rows = order.flatMap(st => P[st].stuck.map(s => ({...s, status:st}))).sort((a,b)=>b.days-a.days).slice(0,40);
+  $('#stuck').innerHTML = '<thead><tr><th>Video</th><th>Show</th><th>Status</th><th>Owner</th><th class="n">Days</th></tr></thead><tbody>' +
+    (rows.length ? rows.map(r => `<tr><td>${esc(r.title)}</td><td>${esc(r.show||'')}</td><td>${esc(r.status)}</td><td>${esc(r.owner||'—')}</td><td class="n">${r.days.toFixed(0)}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Nothing is stuck. Nice.</td></tr>') + '</tbody>';
+}
+load();
+})();
+</script>
+</body>
+</html>
