@@ -37,9 +37,11 @@ CLIENT_ID = os.environ.get("SOCIALBLADE_CLIENT_ID", "")
 SB_TOKEN = os.environ.get("SOCIALBLADE_TOKEN", "")
 SB_BASE = os.environ.get("SOCIALBLADE_BASE", "https://matrix.sbapis.com/b").rstrip("/")
 HISTORY = os.environ.get("SB_HISTORY", "archive")
-PLATFORMS = [p.strip() for p in os.environ.get("SB_PLATFORMS", "instagram,tiktok,twitter,facebook").split(",") if p.strip()]
+# X is gone from Social Blade (every query 404s), so it is not in the default set.
+PLATFORMS = [p.strip() for p in os.environ.get("SB_PLATFORMS", "instagram,tiktok,facebook").split(",") if p.strip()]
 MAX_PROFILES = int(os.environ.get("SB_MAX_PROFILES", "200"))
-ONLY = os.environ.get("SB_ONLY", "").strip().lower()
+ONLY = [x.strip().lower() for x in os.environ.get("SB_ONLY", "").split(",") if x.strip()]  # channel names, comma-separated
+FULL = os.environ.get("SB_FULL") == "1"  # keep every day instead of thinning
 MIN_CREDITS = int(os.environ.get("SB_MIN_CREDITS", "30"))  # stop before the balance drops below this
 F_NOTES = "Notes"
 NOTE = "Social Blade backfill"
@@ -62,8 +64,8 @@ def handle_from_url(platform, url):
     path = [p for p in u.path.split("/") if p]
     if platform == "facebook":
         qs = parse_qs(u.query)
-        if "id" in qs:
-            return qs["id"][0]
+        if "id" in qs or (path and path[0].isdigit()):
+            return None  # Social Blade wants the page's vanity name, not its numeric id
         return path[0] if path else None
     if platform == "youtube":
         if len(path) >= 2 and path[0] == "channel":
@@ -100,7 +102,11 @@ def daily_rows(body):
 
 
 def thin(rows, today):
-    """Daily for 90 days, weekly for a year before that, monthly beyond."""
+    """Daily for 90 days, weekly for a year before that, monthly beyond.
+    SB_FULL=1 keeps every day (fine when only a handful of accounts have
+    real history)."""
+    if FULL:
+        return list(rows)
     keep, last_kept = [], None
     d90 = today - timedelta(days=90)
     d365 = today - timedelta(days=365)
@@ -141,7 +147,7 @@ def channels():
         f = r["fields"]
         if f.get("Status") == "Inactive":
             continue
-        if ONLY and ONLY not in (f.get(CHANNEL_NAME) or "").lower():
+        if ONLY and not any(o in (f.get(CHANNEL_NAME) or "").lower() for o in ONLY):
             continue
         out.append(r)
     return out
@@ -241,7 +247,7 @@ def main():
     if not CLIENT_ID or not SB_TOKEN:
         sys.exit("SOCIALBLADE_CLIENT_ID / SOCIALBLADE_TOKEN not set")
     mode = os.environ.get("SB_MODE", "probe")
-    print(f"Social Blade backfill, mode={mode}, base={SB_BASE}, history={HISTORY}, platforms={PLATFORMS}")
+    print(f"Social Blade backfill, mode={mode}, base={SB_BASE}, history={HISTORY}, platforms={PLATFORMS}, full={FULL}, only={ONLY or 'all'}")
     (run if mode == "run" else probe)()
 
 
