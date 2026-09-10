@@ -117,10 +117,20 @@ def thin(rows, today):
     return keep
 
 
+_existing = None
+
+
 def existing_dates(channel_id, label):
-    rows = list_all(LOGS, **{"fields[]": [F_DATE, F_PLATFORM, F_CHANNEL]})
-    return {r["fields"].get(F_DATE) for r in rows
-            if r["fields"].get(F_PLATFORM) == label and channel_id in (r["fields"].get(F_CHANNEL) or [])}
+    """Dates already logged for a channel/platform. The table is read once;
+    rows this run creates are added to the cache as it goes."""
+    global _existing
+    if _existing is None:
+        _existing = {}
+        for r in list_all(LOGS, **{"fields[]": [F_DATE, F_PLATFORM, F_CHANNEL]}):
+            f = r["fields"]
+            for cid in f.get(F_CHANNEL) or []:
+                _existing.setdefault((cid, f.get(F_PLATFORM)), set()).add(f.get(F_DATE))
+    return _existing.setdefault((channel_id, label), set())
 
 
 def channels():
@@ -196,9 +206,9 @@ def run():
                 batch.append({"fields": {F_PLATFORM: label, F_DATE: d, F_COUNT: n, F_PREVIOUS: prev,
                                          F_CHANNEL: [cid], F_NOTES: NOTE}})
                 prev = n
-            for i in range(0, len(batch), 10):
-                write(LOGS, "POST", batch[i:i + 10])
-                time.sleep(0.25)
+            if batch:
+                write(LOGS, "POST", batch)  # batches of 10 internally
+                have.update(r["fields"][F_DATE] for r in batch)
             created += len(batch)
             print(f"  {name} / {label} ({handle}): {len(rows)} days from Social Blade, {len(batch)} rows written"
                   f" ({rows[0][0]} → {rows[-1][0]}); credits left: {credits.get('available', '?')}")
