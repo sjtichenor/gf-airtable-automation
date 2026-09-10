@@ -332,7 +332,11 @@ def build_snapshot() -> dict:
             "title": vid.get("title") or "",
             "hook": f.get(PO["hook"]) or "",
             "type": vid.get("type"),
-            "date": f.get(PO["date"]),
+            # Date Posted is filled by the platform syncs; LinkedIn has no sync,
+            # so fall back to the day the post was logged (posts are logged
+            # when they go out) and say so.
+            "date": f.get(PO["date"]) or (f.get(PO["created"]) or "")[:10] or None,
+            "date_estimated": not f.get(PO["date"]),
             "created": (f.get(PO["created"]) or "")[:10] or None,
             "created_at": f.get(PO["created"]),
             "poster": collab_name(f.get(PO["poster"])),
@@ -562,7 +566,7 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
         return None
     channels = [dict(c, shows=[show["id"]]) for c in snap.get("channels", []) if show["id"] in c.get("shows", [])]
     channel_ids = {c["id"] for c in channels}
-    keep = ("id", "url", "platform", "channel", "show", "title", "hook", "type", "date", "created",
+    keep = ("id", "url", "platform", "channel", "show", "title", "hook", "type", "date", "date_estimated", "created",
             "views", "likes", "comments", "replays", "reach")
     posts = [{k: p.get(k) for k in keep}
              for p in snap.get("posts", [])

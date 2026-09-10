@@ -269,7 +269,7 @@ function render(){
   const dated = posts.filter(p=>p.date);
   const kp = [
     ['Followers', fmt(now), anySeries ? deltaHtml(fDelta, haveThen ? pct(now, then) : null) : '<span class="d">no snapshots yet</span>'],
-    ['Posts', full(posts.length), `<span class="d">${dated.length < posts.length ? (posts.length-dated.length)+' undated' : (posts.length/Math.max(1,(new Date(end)-new Date(start))/864e5/7)).toFixed(1)+' per week'}</span>`],
+    ['Posts', full(posts.length), `<span class="d">${(posts.length/Math.max(1,(new Date(end)-new Date(start))/864e5/7)).toFixed(1)+' per week'}${posts.some(p=>p.date_estimated) ? ' · '+full(posts.filter(p=>p.date_estimated).length)+' dated by log entry' : ''}</span>`],
     ['Views', fmt(views), `<span class="d">${full(views)}</span>`],
     ['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`],
     ['Comments', fmt(comments), `<span class="d">${posts.some(p=>p.comments!=null) ? full(posts.filter(p=>p.comments!=null).length)+' posts with data' : (CLIENT ? 'where the platform reports it' : 'Facebook only so far')}</span>`],
