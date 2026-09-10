@@ -8,15 +8,18 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from . import activity, auth, slack
-from .data import cache
+from .data import cache, client_view, slugify
 
 router = APIRouter(prefix="/dashboard")
 HERE = os.path.dirname(__file__)
 
 
-def login_page(error: str = "") -> str:
-    # str.format would trip on the CSS braces; a marker swap is safer.
-    return LOGIN.replace("<!--ERROR-->", error)
+def login_page(error: str = "", title: str = "Good Future Media", heading: str = "Good Future Media",
+               blurb: str = "Analytics dashboard. Team password.", action: str = "/dashboard/login") -> str:
+    # str.format would trip on the CSS braces; marker swaps are safer.
+    return (LOGIN.replace("<!--ERROR-->", error).replace("<!--TITLE-->", html.escape(title))
+            .replace("<!--HEADING-->", html.escape(heading)).replace("<!--BLURB-->", html.escape(blurb))
+            .replace('action="/dashboard/login"', f'action="{action}"'))
 
 
 def _read(name: str) -> str:
@@ -24,7 +27,7 @@ def _read(name: str) -> str:
         return fh.read()
 
 
-LOGIN = """<!doctype html><html><head><meta charset="utf-8"><title>Good Future Media · Sign in</title>
+LOGIN = """<!doctype html><html><head><meta charset="utf-8"><title><!--TITLE--> · Sign in</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -36,7 +39,7 @@ input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;bord
 button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:10px;background:#4f8cff;color:#fff;font-weight:600;font-size:15px;cursor:pointer}
 .err{color:#ff7b72;font-size:13px;margin:10px 0 0}
 </style></head><body><form method="post" action="/dashboard/login">
-<h1>Good Future Media</h1><p>Analytics dashboard. Team password.</p>
+<h1><!--HEADING--></h1><p><!--BLURB--></p>
 <input type="password" name="password" placeholder="Password" autofocus autocomplete="current-password">
 <button type="submit">Sign in</button><!--ERROR--></form></body></html>"""
 
@@ -46,7 +49,12 @@ button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:10px;backg
 def home(request: Request):
     if not auth.is_authed(request):
         return RedirectResponse("/dashboard/login", status_code=303)
-    return HTMLResponse(_read("index.html"))
+    return HTMLResponse(_page_with_mode({"mode": "team"}))
+
+
+def _page_with_mode(mode: dict) -> str:
+    import json
+    return _read("index.html").replace("<!--MODE-->", "<script>window.GF_MODE=" + json.dumps(mode) + "</script>")
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -195,3 +203,82 @@ def start_background() -> None:
     cache.start()
     import threading
     threading.Thread(target=_digest_loop, name="dashboard-digest", daemon=True).start()
+
+
+# ── client dashboards: /clients/<show-slug> ──────────────────────────────
+clients = APIRouter(prefix="/clients")
+
+
+def _client_show(slug: str):
+    if slug not in auth.client_passwords():
+        return None
+    if cache.snapshot is None:
+        return {"name": slug.replace("-", " ").title(), "warming": True}
+    view = client_view(cache.snapshot, slug)
+    return view["client"] if view else None
+
+
+def _client_login(slug: str, error: str = "", status: int = 200):
+    show = _client_show(slug)
+    if not show:
+        return HTMLResponse("Not found", status_code=404)
+    return HTMLResponse(login_page(error, title=show["name"], heading=show["name"],
+                                   blurb="Performance report by Good Future Media.", action=f"/clients/{slug}/login"),
+                        status_code=status)
+
+
+@clients.get("/{slug}", response_class=HTMLResponse)
+def client_home(slug: str, request: Request):
+    slug = slug.lower()
+    if slug not in auth.client_passwords():
+        return HTMLResponse("Not found", status_code=404)
+    if not auth.is_client_authed(request, slug):
+        return RedirectResponse(f"/clients/{slug}/login", status_code=303)
+    show = _client_show(slug) or {"name": slug}
+    return HTMLResponse(_page_with_mode({"mode": "client", "slug": slug, "name": show.get("name"), "logo": show.get("logo")}))
+
+
+@clients.get("/{slug}/login", response_class=HTMLResponse)
+def client_login_form(slug: str, request: Request):
+    slug = slug.lower()
+    if auth.is_client_authed(request, slug):
+        return RedirectResponse(f"/clients/{slug}", status_code=303)
+    return _client_login(slug)
+
+
+@clients.post("/{slug}/login", response_class=HTMLResponse)
+async def client_login(slug: str, request: Request):
+    slug = slug.lower()
+    ip = auth.client_ip(request)
+    if auth.throttled(ip):
+        return _client_login(slug, "<p class='err'>Too many attempts. Try again in ten minutes.</p>", 429)
+    body = (await request.body()).decode("utf-8", "replace")
+    candidate = parse_qs(body).get("password", [""])[0]
+    if auth.check_client_password(slug, candidate):
+        resp = RedirectResponse(f"/clients/{slug}", status_code=303)
+        auth.set_client_cookie(resp, slug)
+        return resp
+    auth.record_failure(ip)
+    time.sleep(1)
+    return _client_login(slug, "<p class='err'>That's not it.</p>", 401)
+
+
+@clients.get("/{slug}/logout")
+def client_logout(slug: str):
+    slug = slug.lower()
+    resp = RedirectResponse(f"/clients/{slug}/login", status_code=303)
+    auth.clear_client_cookie(resp, slug)
+    return resp
+
+
+@clients.get("/{slug}/api/data")
+def client_data(slug: str, request: Request):
+    slug = slug.lower()
+    if not auth.is_client_authed(request, slug):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if cache.snapshot is None:
+        return JSONResponse({"error": "warming up"}, status_code=503, headers={"Retry-After": "5"})
+    view = client_view(cache.snapshot, slug)
+    if not view:
+        return JSONResponse({"error": "unknown show"}, status_code=404)
+    return JSONResponse(view, headers={"Cache-Control": "private, max-age=60"})

@@ -30,7 +30,7 @@ def configured() -> bool:
 
 
 def _secret() -> str:
-    return os.environ.get("DASHBOARD_SECRET") or hashlib.sha256(("gf-dash:" + PASSWORD).encode()).hexdigest()
+    return os.environ.get("DASHBOARD_SECRET") or hashlib.sha256(("gf-dash:" + PASSWORD + ":" + os.environ.get("CLIENT_PASSWORDS", "")).encode()).hexdigest()
 
 
 def session_token() -> str:
@@ -75,3 +75,50 @@ def set_cookie(response) -> None:
 
 def clear_cookie(response) -> None:
     response.delete_cookie(COOKIE, path="/dashboard")
+
+
+# ── client dashboards ────────────────────────────────────────────────────
+# CLIENT_PASSWORDS = "trading-places=hunter2;another-show=pw" — one entry per
+# show slug (lower-case show name, non-alphanumerics → '-'). Each client gets
+# its own cookie, signed with the shared secret plus their password, so
+# changing a client's password logs only that client out.
+
+def client_passwords() -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for part in os.environ.get("CLIENT_PASSWORDS", "").split(";"):
+        if "=" in part:
+            slug, pw = part.split("=", 1)
+            if slug.strip() and pw.strip():
+                out[slug.strip().lower()] = pw.strip()
+    return out
+
+
+def client_cookie(slug: str) -> str:
+    return "gf_client_" + "".join(c if c.isalnum() else "_" for c in slug)
+
+
+def client_token(slug: str) -> str:
+    pw = client_passwords().get(slug, "")
+    return hmac.new(_secret().encode(), f"gf-client-v1:{slug}:{pw}".encode(), hashlib.sha256).hexdigest()
+
+
+def is_client_authed(request: Request, slug: str) -> bool:
+    if FAKE_DATA:
+        return True
+    if slug not in client_passwords():
+        return False
+    return hmac.compare_digest(request.cookies.get(client_cookie(slug), ""), client_token(slug))
+
+
+def check_client_password(slug: str, candidate: str) -> bool:
+    pw = client_passwords().get(slug)
+    return bool(pw) and hmac.compare_digest(candidate.encode(), pw.encode())
+
+
+def set_client_cookie(response, slug: str) -> None:
+    response.set_cookie(client_cookie(slug), client_token(slug), max_age=MAX_AGE, httponly=True,
+                        secure=ON_RENDER, samesite="lax", path=f"/clients/{slug}")
+
+
+def clear_client_cookie(response, slug: str) -> None:
+    response.delete_cookie(client_cookie(slug), path=f"/clients/{slug}")

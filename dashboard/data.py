@@ -543,3 +543,40 @@ class Cache:
 
 
 cache = Cache()
+
+
+# ── client dashboards ────────────────────────────────────────────────────
+
+def slugify(name: str) -> str:
+    return "-".join(w for w in "".join(c.lower() if c.isalnum() else " " for c in (name or "")).split())
+
+
+def client_view(snap: dict, slug: str) -> Optional[dict]:
+    """The slice of the snapshot one client may see: their show, the
+    channels linked to it, posts on those channels (or cut from that
+    show's episodes) and those channels' follower history. Internal
+    attribution — editor, director, poster, client account — is removed
+    before anything leaves the server."""
+    show = next((sh for sh in snap.get("shows", []) if slugify(sh["name"]) == slug), None)
+    if not show:
+        return None
+    channels = [dict(c, shows=[show["id"]]) for c in snap.get("channels", []) if show["id"] in c.get("shows", [])]
+    channel_ids = {c["id"] for c in channels}
+    keep = ("id", "url", "platform", "channel", "show", "title", "hook", "type", "date", "created",
+            "views", "likes", "comments", "replays", "reach")
+    posts = [{k: p.get(k) for k in keep}
+             for p in snap.get("posts", [])
+             if (p.get("channel") in channel_ids) or (p.get("show") == show["name"])]
+    for p in posts:
+        if p["channel"] not in channel_ids:
+            p["channel"] = None
+        p["show"] = show["name"]
+    followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
+    return {
+        "generated_at": snap.get("generated_at"),
+        "client": {"slug": slug, "name": show["name"], "logo": show.get("logo")},
+        "shows": [show],
+        "channels": channels,
+        "posts": posts,
+        "followers": followers,
+    }

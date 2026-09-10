@@ -27,6 +27,10 @@ header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85
 .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed)}
 .brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
 .spacer{flex:1}
+.byline{font-size:12px;color:var(--muted)}
+.brand img.logo{width:28px;height:28px;border-radius:8px;object-fit:cover}
+body.client #topCard{grid-column:span 12}
+body.client .nav,body.client #fShow,body.client #fEditor,body.client #refresh,body.client #ownedWrap,body.client #editorsCard{display:none}
 .nav{display:flex;gap:4px;margin-left:8px}.nav a{padding:6px 10px;border-radius:8px;color:var(--muted);font-weight:500}.nav a.on{background:var(--chip);color:var(--text)}
 .meta{color:var(--muted);font-size:12px;display:flex;gap:14px;align-items:center}
 button.ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
@@ -74,13 +78,14 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 <div id="overlay"><div><b>Loading analytics</b><span id="ovmsg">Fetching the latest snapshot…</span></div></div>
 <header><div class="bar">
   <div class="brand"><span class="dot"></span>Good Future Media<span class="sub">Analytics</span></div>
+  <span class="byline"></span>
   <nav class="nav"><a class="on" href="/dashboard">Overview</a><a href="/dashboard/team">Team</a></nav>
   <div class="spacer"></div>
   <div class="meta"><span id="stamp"></span>
     <button class="ghost" id="refresh" title="Pull fresh numbers from Airtable now">Refresh data</button>
     <button class="ghost" id="theme">Dark</button>
     <button class="ghost" id="share" title="Copy a link with the current filters">Copy link</button>
-    <a href="/dashboard/logout" class="ghost" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px">Sign out</a>
+    <a id="signout" href="/dashboard/logout" class="ghost" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px">Sign out</a>
   </div>
 </div></header>
 <main>
@@ -94,7 +99,7 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
       <option value="365">Last 12 months</option><option value="ytd">Year to date</option><option value="all">All time</option>
     </select>
     <div class="chips" id="platforms"></div>
-    <label class="toggle"><input type="checkbox" id="fOwned"> GF-owned only</label>
+    <label class="toggle" id="ownedWrap"><input type="checkbox" id="fOwned"> GF-owned only</label>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -107,17 +112,32 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
     <div class="card span4"><h3>Views by platform</h3><div class="sub">Share of views in the selected range</div><div class="chart"><canvas id="cDonut"></canvas></div></div>
 
     <div class="card span6"><h3>Posting volume</h3><div class="sub">Posts per week, with average views per post</div><div class="chart"><canvas id="cVolume"></canvas></div></div>
-    <div class="card span6"><h3>Views by show</h3><div class="sub">Top shows in the selected range</div><div class="chart"><canvas id="cShows"></canvas></div></div>
+    <div class="card span6"><h3 id="showsTitle">Views by show</h3><div class="sub" id="showsSub">Top shows in the selected range</div><div class="chart"><canvas id="cShows"></canvas></div></div>
 
     <div class="card span12"><h3>Accounts</h3><div class="sub">Follower count is the latest snapshot; changes compare against the snapshot nearest the start of each window</div><div class="tablewrap"><table id="tAccounts"></table></div></div>
-    <div class="card span6"><h3>Editors</h3><div class="sub">Clips posted in the range, by the editor who cut them</div><div class="tablewrap"><table id="tEditors"></table></div></div>
-    <div class="card span6"><h3>Top posts</h3><div class="sub">Most viewed in the selected range</div><div class="tablewrap"><table id="tTop"></table></div></div>
+    <div class="card span6" id="editorsCard"><h3>Editors</h3><div class="sub">Clips posted in the range, by the editor who cut them</div><div class="tablewrap"><table id="tEditors"></table></div></div>
+    <div class="card span6" id="topCard"><h3>Top posts</h3><div class="sub">Most viewed in the selected range</div><div class="tablewrap"><table id="tTop"></table></div></div>
   </div>
   <div class="foot" id="foot"></div>
 </main>
 
+<!--MODE-->
 <script>
 (() => {
+const MODE = window.GF_MODE || {mode:'team'};
+const CLIENT = MODE.mode === 'client';
+const API = CLIENT ? `/clients/${MODE.slug}/api` : '/dashboard/api';
+const LOGIN_URL = CLIENT ? `/clients/${MODE.slug}/login` : '/dashboard/login';
+if (CLIENT) {
+  document.title = `${MODE.name} · Performance report`;
+  document.body.classList.add('client');
+  const b = document.querySelector('.brand');
+  b.innerHTML = (MODE.logo ? `<img class="logo" src="${MODE.logo}" alt="">` : '<span class="dot"></span>') + `${MODE.name.replace(/[&<>]/g,'')}<span class="sub">Performance report</span>`;
+  document.querySelector('.byline').textContent = 'Prepared by Good Future Media';
+  document.querySelector('#signout').href = `/clients/${MODE.slug}/logout`;
+  document.querySelector('#showsTitle').textContent = 'Views by account';
+  document.querySelector('#showsSub').textContent = 'Each account and platform in the selected range';
+}
 const PCOLORS = {Instagram:'#e1306c', TikTok:'#22c1c3', YouTube:'#ff3d3d', X:'#7c8a9e', Facebook:'#1877f2', Threads:'#a78bfa', LinkedIn:'#0a66c2', Other:'#9ca3af'};
 const PORDER = ['Instagram','TikTok','YouTube','X','Facebook','Threads','LinkedIn','Other'];
 const $ = s => document.querySelector(s);
@@ -155,16 +175,16 @@ $('#share').onclick = async () => { writeUrl(); try{ await navigator.clipboard.w
 
 // ── load ───────────────────────────────────────────────────────────────
 async function load(){
-  const r = await fetch('/dashboard/api/data', {credentials:'same-origin'});
-  if (r.status === 401) { location.href = '/dashboard/login'; return; }
+  const r = await fetch(API + '/data', {credentials:'same-origin'});
+  if (r.status === 401) { location.href = LOGIN_URL; return; }
   if (r.status === 503) { const s = await r.json(); $('#ovmsg').textContent = s.last_error ? 'Last refresh failed: '+s.last_error+' — retrying' : 'First load pulls everything from Airtable; about a minute…'; setTimeout(load, 5000); return; }
   DATA = await r.json();
   DATA.channels.forEach(c => byId[c.id] = c); DATA.shows.forEach(s => byId[s.id] = s);
   buildFilters(); $('#overlay').style.display='none'; render();
 }
 $('#refresh').onclick = async () => { const before = DATA && DATA.generated_at; $('#refresh').textContent='Refreshing…';
-  await fetch('/dashboard/api/refresh', {method:'POST', credentials:'same-origin'});
-  const poll = async () => { const s = await (await fetch('/dashboard/api/status',{credentials:'same-origin'})).json();
+  await fetch(API + '/refresh', {method:'POST', credentials:'same-origin'});
+  const poll = async () => { const s = await (await fetch(API + '/status',{credentials:'same-origin'})).json();
     if (s.generated_at && s.generated_at !== before) { await load(); $('#refresh').textContent='Refresh data'; }
     else if (s.last_error && !s.refreshing) { $('#refresh').textContent='Refresh failed'; alert('Refresh failed: '+s.last_error); }
     else setTimeout(poll, 3000); };
@@ -252,15 +272,15 @@ function render(){
     ['Posts', full(posts.length), `<span class="d">${dated.length < posts.length ? (posts.length-dated.length)+' undated' : (posts.length/Math.max(1,(new Date(end)-new Date(start))/864e5/7)).toFixed(1)+' per week'}</span>`],
     ['Views', fmt(views), `<span class="d">${full(views)}</span>`],
     ['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`],
-    ['Comments', fmt(comments), `<span class="d">${posts.some(p=>p.comments!=null) ? full(posts.filter(p=>p.comments!=null).length)+' posts with data' : 'Facebook only so far'}</span>`],
+    ['Comments', fmt(comments), `<span class="d">${posts.some(p=>p.comments!=null) ? full(posts.filter(p=>p.comments!=null).length)+' posts with data' : (CLIENT ? 'where the platform reports it' : 'Facebook only so far')}</span>`],
     ['Avg views / post', fmt(posts.length ? views/posts.length : null), `<span class="d">median ${fmt(median(posts.map(p=>p.views||0)))}</span>`],
   ];
   $('#kpis').innerHTML = kp.map(([l,v,d]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
 
   renderFollowers(sel, series); renderNet(sel, series); renderViewsWeek(posts, start, end); renderDonut(posts); renderVolume(posts, start, end); renderShows(posts);
-  renderAccounts(sel, series); renderEditors(posts); renderTop(posts);
+  renderAccounts(sel, series); if (!CLIENT) renderEditors(posts); renderTop(posts);
   $('#stamp').textContent = 'Data as of ' + new Date(DATA.generated_at).toLocaleString() + (DATA.build_seconds ? ` · pulled in ${DATA.build_seconds}s` : '');
-  $('#foot').textContent = `${full(DATA.posts.length)} posts, ${full(DATA.followers.length)} follower snapshots and ${DATA.channels.length} accounts loaded. Follower history starts ${DATA.followers.length ? DATA.followers.map(f=>f.date).reduce((a,b)=>a<b?a:b) : '—'}; views are lifetime totals per post as last synced.`;
+  $('#foot').textContent = (CLIENT ? `${MODE.name} · ` : '') + `${full(DATA.posts.length)} posts, ${full(DATA.followers.length)} follower snapshots and ${DATA.channels.length} accounts loaded. Follower history starts ${DATA.followers.length ? DATA.followers.map(f=>f.date).reduce((a,b)=>a<b?a:b) : '—'}; views are lifetime totals per post as last synced.` + (CLIENT ? ' Prepared by Good Future Media.' : '');
 }
 function median(a){ if (!a.length) return null; const s=[...a].sort((x,y)=>x-y); const m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
 function days(start, end){ const out=[]; for (let d=start; d<=end; d=addDays(d,1)) out.push(d); return out; }
@@ -314,7 +334,8 @@ function renderVolume(posts, start, end){
     options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{position:'left', ticks:{precision:0}}, y2:{position:'right', grid:{display:false}, ticks:{callback:fmt}}}}});
 }
 function renderShows(posts){
-  const m = {}; posts.forEach(p => { const k = p.show || (p.channel && byId[p.channel]?.shows?.[0] && byId[byId[p.channel].shows[0]]?.name) || 'Unassigned'; m[k] = (m[k]||0) + (p.views||0); });
+  const m = {}; posts.forEach(p => { const k = CLIENT ? (p.channel ? (byId[p.channel]?.name + ' · ' + p.platform) : p.platform)
+    : (p.show || (p.channel && byId[p.channel]?.shows?.[0] && byId[byId[p.channel].shows[0]]?.name) || 'Unassigned'); m[k] = (m[k]||0) + (p.views||0); });
   const rows = Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
   line('cShows', {type:'bar', data:{labels: rows.map(r=>r[0]), datasets:[{data: rows.map(r=>r[1]), backgroundColor:accent, borderRadius:4, barThickness:14}]},
@@ -353,7 +374,10 @@ function renderEditors(posts){
 }
 function renderTop(posts){
   const rows = [...posts].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,40).map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
-  table('tTop', [{h:'Post', k:'title', t:true, f: r => r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.title)}">${esc(r.title)}</a>` : esc(r.title)}, {h:'Account', k:'account'}, {h:'Platform', k:'platform', f: r => pill(r.platform)}, {h:'Editor', k:'editor'}, {h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Likes', k:'likes', n:true}, {h:'Comments', k:'comments', n:true}], rows, {k:'views', d:'desc'});
+  const cols = [{h:'Post', k:'title', t:true, f: r => r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.title)}">${esc(r.title)}</a>` : esc(r.title)}, {h:'Account', k:'account'}, {h:'Platform', k:'platform', f: r => pill(r.platform)}];
+  if (!CLIENT) cols.push({h:'Editor', k:'editor'});
+  cols.push({h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Likes', k:'likes', n:true}, {h:'Comments', k:'comments', n:true});
+  table('tTop', cols, rows, {k:'views', d:'desc'});
 }
 
 load();
