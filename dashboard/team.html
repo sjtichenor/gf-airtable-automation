@@ -167,12 +167,11 @@ function heat(p){
   return `<div class="months">${months.join('')}</div><div class="heat">${cols.join('')}</div>`;
 }
 function statsFor(p){
-  const t = p.totals; const r = p.roles;
-  const s = [];
-  if (r.includes('Editor') || (r.includes('Bootcamp Recruit') && !r.includes('Director')) || (!r.length && (t.finished||t.started))) s.push(['Finished', t.finished||0], ['Started', (t.started||0)+(t.picked_up||0)], ['Revisions', t.revision_started||0]);
-  if (r.includes('Director') || t.approved || t.sent_back) s.push(['Approved', t.approved||0], ['Sent back', t.sent_back||0]);
-  if (r.includes('Social Media Manager') || t.posted) s.push(['Posts', t.posted||0]);
-  if (t.created && !s.length) s.push(['Videos created', t.created]);
+  const t = p.totals; const s = [];
+  if (p.group==='Editors' || p.group==='Bootcamp') s.push(['Finished', t.finished||0], ['Started', (t.started||0)+(t.picked_up||0)], ['Revisions', t.revision_started||0]);
+  if (p.group==='Directors' || (p.group==='Bootcamp' && (t.approved||t.sent_back))) s.push(['Approved', t.approved||0], ['Sent back', t.sent_back||0]);
+  if (p.group==='Social') s.push(['Posts', t.posted||0]);
+  if (p.group==='Other') s.push(['Actions', Object.values(t).reduce((a,b)=>a+b,0)]);
   s.push(['Active days', p.active_days]);
   return s.map(([l,v]) => `<div class="stat"><div class="v">${v.toLocaleString()}</div><div class="l">${l}</div></div>`).join('');
 }
@@ -183,7 +182,7 @@ function render(){
     const av = p.photo ? `<img class="avatar" src="${esc(p.photo)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'avatar',textContent:'${initials}'}))">` : `<div class="avatar">${initials}</div>`;
     const q = p.quiet_days; const badge = q==null ? '<span class="badge">no activity loaded</span>' : q===0 ? '<span class="badge today">active today</span>' : q>=2 ? `<span class="badge quiet">quiet ${q}d</span>` : `<span class="badge">last active yesterday</span>`;
     const wip = p.in_progress.length ? `<div class="wip"><b>${p.in_progress.length} in progress:</b> ` + p.in_progress.slice(0,3).map(w => `${esc((w.title||'').slice(0,48))} <span>(${w.status}, ${w.days!=null?w.days.toFixed(0)+'d':'?'})</span>`).join(' · ') + (p.in_progress.length>3?` · +${p.in_progress.length-3} more`:'') + '</div>' : '';
-    return `<div class="card"><div class="who">${av}<div><div class="n">${esc(p.name)}</div><div class="r">${esc(p.roles.join(' · ') || 'No Team row')}${p.bootcamp_class?' · '+esc(p.bootcamp_class):''}</div></div>${badge}</div>
+    return `<div class="card"><div class="who">${av}<div><div class="n">${esc(p.name)}</div><div class="r">${esc(p.roles.join(' · ') || 'No Team row')}${p.bootcamp_class?' · '+esc(p.bootcamp_class):''}${p.group==='Social' && !p.roles.includes('Social Media Manager') ? ' · posts' : ''}</div></div>${badge}</div>
       <div class="stats">${statsFor(p)}</div>${heat(p)}${wip}</div>`; };
   $('#people').innerHTML = ps.length ? GROUPS.map(([g, label]) => { const list = ps.filter(p=>p.group===g); if (!list.length) return '';
       const active = list.filter(p=>p.quiet_days===0).length, quiet = list.filter(p=>p.quiet_days>=2).length;

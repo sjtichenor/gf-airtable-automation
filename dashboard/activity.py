@@ -152,14 +152,16 @@ def people_index(snap: dict) -> Dict[str, dict]:
 
 
 def summary(snap: dict, days: int = 90) -> dict:
+    """One card per person *per kind of work*: someone who edits and also
+    posts gets an Editors card and a Social card, each with its own heatmap,
+    counts and quiet badge. Bootcamp recruits keep everything on one card
+    in the Bootcamp section."""
     events = build_events(snap)
     today = today_local().date()
     start = today - timedelta(days=days - 1)
     s_iso, t_iso = start.isoformat(), today.isoformat()
-    in_range = [e for e in events if s_iso <= e["date"] <= t_iso]
 
     team = people_index(snap)
-    people: Dict[str, dict] = {}
 
     def hidden(name) -> bool:
         """Former team members (Employment Status = Inactive) stay off the page."""
@@ -167,40 +169,59 @@ def summary(snap: dict, days: int = 90) -> dict:
         return bool(t) and not t.get("active", True)
 
     events = [e for e in events if not (e["person"] and hidden(e["person"]))]
-    in_range = [e for e in in_range if not (e["person"] and hidden(e["person"]))]
+    in_range = [e for e in events if s_iso <= e["date"] <= t_iso]
 
-    def person(name):
-        if name not in people:
+    cards: Dict[tuple, dict] = {}
+
+    def section_for(name, ev_role) -> str:
+        if "Bootcamp Recruit" in (team.get(name, {}).get("roles") or []):
+            return "Bootcamp"
+        return {"editor": "Editors", "miner": "Editors", "director": "Directors", "social": "Social"}.get(ev_role, "Other")
+
+    def card(name, section):
+        key = (name, section)
+        if key not in cards:
             t = team.get(name, {})
-            roles = t.get("roles") or []
-            people[name] = {"name": name, "roles": roles, "team": t.get("team"), "active": t.get("active", True),
-                            "bootcamp_class": t.get("bootcamp_class"), "group": group_of(roles),
-                            "photo": t.get("photo"), "in_team": name in team, "by_day": {}, "totals": {}, "windows": {},
-                            "last_active": None, "quiet_days": None, "in_progress": []}
-        return people[name]
+            cards[key] = {"name": name, "group": section, "roles": t.get("roles") or [], "team": t.get("team"),
+                          "active": t.get("active", True), "bootcamp_class": t.get("bootcamp_class"),
+                          "photo": t.get("photo"), "in_team": name in team, "by_day": {}, "totals": {}, "windows": {},
+                          "last_active": None, "quiet_days": None, "in_progress": []}
+        return cards[key]
 
+    # Seed from Team roles so people with nothing in the window still show up.
     for t in team.values():
-        if t.get("active") and set(t.get("roles") or []) & WORK_ROLES:
-            person(t["name"])
+        r = set(t.get("roles") or [])
+        if not t.get("active") or not (r & WORK_ROLES):
+            continue
+        if "Bootcamp Recruit" in r:
+            card(t["name"], "Bootcamp")
+            continue
+        if "Editor" in r:
+            card(t["name"], "Editors")
+        if "Director" in r:
+            card(t["name"], "Directors")
+        if "Social Media Manager" in r:
+            card(t["name"], "Social")
     for e in events:
         if not e["person"]:
             continue
-        p = person(e["person"])
-        if e["ts"] > (p["last_active"] or ""):
-            p["last_active"] = e["ts"]
+        c = card(e["person"], section_for(e["person"], e["role"]))
+        if e["ts"] > (c["last_active"] or ""):
+            c["last_active"] = e["ts"]
     for e in in_range:
         if not e["person"]:
             continue
-        p = person(e["person"])
-        p["by_day"][e["date"]] = p["by_day"].get(e["date"], 0) + 1
-        p["totals"][e["kind"]] = p["totals"].get(e["kind"], 0) + 1
-        w = p["windows"].setdefault(e["date"], [e["time"], e["time"]])
+        c = card(e["person"], section_for(e["person"], e["role"]))
+        c["by_day"][e["date"]] = c["by_day"].get(e["date"], 0) + 1
+        c["totals"][e["kind"]] = c["totals"].get(e["kind"], 0) + 1
+        w = c["windows"].setdefault(e["date"], [e["time"], e["time"]])
         w[0], w[1] = min(w[0], e["time"]), max(w[1], e["time"])
-    for p in people.values():
-        p["active_days"] = len(p["by_day"])
-        if p["last_active"]:
-            last = datetime.fromisoformat(p["last_active"]).astimezone(TZ).date()
-            p["quiet_days"] = (today - last).days
+    for c in cards.values():
+        c["active_days"] = len(c["by_day"])
+        if c["last_active"]:
+            last = datetime.fromisoformat(c["last_active"]).astimezone(TZ).date()
+            c["quiet_days"] = (today - last).days
+
     now = datetime.now(timezone.utc)
     for v in snap.get("videos", []):
         st = v.get("status")
@@ -208,11 +229,15 @@ def summary(snap: dict, days: int = 90) -> dict:
             continue  # nobody owns it yet / it is the social team's now
         since = parse(v.get("status_since"))
         age = (now - since).total_seconds() / 86400 if since else None
-        owner = v.get("director") if st in ("Internal Review", "Client Review") else v.get("editor")
-        if owner and owner in people:
-            people[owner]["in_progress"].append({"video": v["id"], "title": v.get("title"), "status": st, "days": round(age, 1) if age is not None else None})
-    for p in people.values():
-        p["in_progress"].sort(key=lambda x: -(x["days"] or 0))
+        is_review = st in ("Internal Review", "Client Review")
+        owner = v.get("director") if is_review else v.get("editor")
+        if not owner or hidden(owner):
+            continue
+        key = (owner, section_for(owner, "director" if is_review else "editor"))
+        if key in cards:
+            cards[key]["in_progress"].append({"video": v["id"], "title": v.get("title"), "status": st, "days": round(age, 1) if age is not None else None})
+    for c in cards.values():
+        c["in_progress"].sort(key=lambda x: -(x["days"] or 0))
 
     pipeline = {st: {"count": 0, "stuck": []} for st in OPEN_STATUSES}
     for v in snap.get("videos", []):
@@ -228,7 +253,7 @@ def summary(snap: dict, days: int = 90) -> dict:
     for st in pipeline:
         pipeline[st]["stuck"].sort(key=lambda x: -x["days"])
 
-    plist = sorted(people.values(), key=lambda p: (GROUP_ORDER.index(p["group"]), p["bootcamp_class"] or "", -(sum(p["by_day"].values())), p["name"]))
+    plist = sorted(cards.values(), key=lambda c: (GROUP_ORDER.index(c["group"]), c["bootcamp_class"] or "", -(sum(c["by_day"].values())), c["name"]))
     return {"tz": TZ_NAME, "today": t_iso, "start": s_iso, "days": days, "people": plist, "events": in_range, "pipeline": pipeline,
             "kinds": KIND_LABEL}
 
