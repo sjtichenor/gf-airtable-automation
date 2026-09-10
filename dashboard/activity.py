@@ -124,6 +124,25 @@ def _channel_name(snap, cid):
     return _channel_cache[key].get(cid)
 
 
+GROUP_ORDER = ["Editors", "Directors", "Social", "Bootcamp", "Other"]
+
+
+def group_of(roles) -> str:
+    """Which section of the Team page someone belongs in. Bootcamp recruits
+    are grouped together even when they also carry Director, so a class can
+    be read as a class."""
+    r = set(roles or [])
+    if "Bootcamp Recruit" in r:
+        return "Bootcamp"
+    if "Editor" in r:
+        return "Editors"
+    if "Director" in r:
+        return "Directors"
+    if "Social Media Manager" in r:
+        return "Social"
+    return "Other"
+
+
 def today_local() -> datetime:
     return datetime.now(timezone.utc).astimezone(TZ)
 
@@ -153,7 +172,9 @@ def summary(snap: dict, days: int = 90) -> dict:
     def person(name):
         if name not in people:
             t = team.get(name, {})
-            people[name] = {"name": name, "roles": t.get("roles") or [], "team": t.get("team"), "active": t.get("active", True),
+            roles = t.get("roles") or []
+            people[name] = {"name": name, "roles": roles, "team": t.get("team"), "active": t.get("active", True),
+                            "bootcamp_class": t.get("bootcamp_class"), "group": group_of(roles),
                             "photo": t.get("photo"), "in_team": name in team, "by_day": {}, "totals": {}, "windows": {},
                             "last_active": None, "quiet_days": None, "in_progress": []}
         return people[name]
@@ -207,8 +228,7 @@ def summary(snap: dict, days: int = 90) -> dict:
     for st in pipeline:
         pipeline[st]["stuck"].sort(key=lambda x: -x["days"])
 
-    order = {"Editor": 0, "Director": 1, "Social Media Manager": 2, "Bootcamp Recruit": 3}
-    plist = sorted(people.values(), key=lambda p: (min([order.get(r, 9) for r in p["roles"]] or [9]), -(sum(p["by_day"].values())), p["name"]))
+    plist = sorted(people.values(), key=lambda p: (GROUP_ORDER.index(p["group"]), p["bootcamp_class"] or "", -(sum(p["by_day"].values())), p["name"]))
     return {"tz": TZ_NAME, "today": t_iso, "start": s_iso, "days": days, "people": plist, "events": in_range, "pipeline": pipeline,
             "kinds": KIND_LABEL}
 
@@ -280,7 +300,9 @@ def digest(snap: dict, day_from, day_to=None) -> dict:
             social.append(f"*{name}* — {len(posts)} posts (" + ", ".join(f"{p} {n}" for p, n in sorted(plat.items(), key=lambda x: -x[1])) + ")"
                           + (" · " + ", ".join(accts[:6]) + ("…" if len(accts) > 6 else "") if accts else "") + f" · {window(posts)}")
         if edit_bits:
-            editors.append(f"*{name}* — " + ", ".join(edit_bits) + f" · {window([e for e in evs if e['role'] in ('editor', 'miner')])}")
+            bc = team.get(name, {}).get("bootcamp_class")
+            tag = f" ({bc})" if "Bootcamp Recruit" in r and bc else ""
+            editors.append(f"*{name}*{tag} — " + ", ".join(edit_bits) + f" · {window([e for e in evs if e['role'] in ('editor', 'miner')])}")
         if dir_bits:
             directors.append(f"*{name}* — " + ", ".join(dir_bits) + f" · {window([e for e in evs if e['role'] == 'director'])}")
 
@@ -292,9 +314,11 @@ def digest(snap: dict, day_from, day_to=None) -> dict:
     quiet_lines = []
     for name in quiet:
         ls = last_seen.get(name)
+        if ls and ls > t_iso:
+            continue  # nothing in the window, but active since — not quiet
         if ls:
-            gap = (today - datetime.strptime(ls, "%Y-%m-%d").date()).days
-            quiet_lines.append(f"{name} (last seen {_fmt_day(datetime.strptime(ls, '%Y-%m-%d'))}, {gap}d)")
+            gap = (day_to - datetime.strptime(ls, "%Y-%m-%d").date()).days
+            quiet_lines.append(f"{name} (last seen {_fmt_day(datetime.strptime(ls, '%Y-%m-%d'))}, {gap}d before)")
         else:
             quiet_lines.append(f"{name} (no activity in the loaded window)")
 

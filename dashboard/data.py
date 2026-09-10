@@ -124,6 +124,7 @@ TE = {
     "slack_id": "fldinJYPc2nTSa7KC",  # Slack ID
     "photo": "fldEw903S1b9Bi6aC",     # Photo
     "start": "fldlq4ZRfCkdkKsF6",     # Start Date
+    "bootcamp": "flddA3zwYMTfOhU9z",  # Bootcamp Class
 }
 CL = {"name": "fldGWgYaByXkGtc3Y"}    # Client Account Name
 
@@ -197,7 +198,9 @@ def build_snapshot() -> dict:
         user = f.get(TE["user"]) or {}
         st = f.get(TE["status"])
         tm = f.get(TE["team"])
+        bc = f.get(TE["bootcamp"])
         team_rows.append({
+            "bootcamp_class": bc.get("name") if isinstance(bc, dict) else bc,
             "id": r["id"],
             "name": f.get(TE["name"]) or user.get("name") or "?",
             "email": user.get("email"),
@@ -370,7 +373,10 @@ def fake_snapshot() -> dict:
     editors = ["Ana", "Ben", "Chloe", "Dev", "Eli"]
     directors = ["Maya", "Theo"]
     posters = ["Jay", "Kim", "Lee"]
-    team_rows = ([{"id": f"t{n}", "name": n, "email": None, "user_id": None, "roles": ["Editor"], "team": "Video Production", "active": True, "slack_id": None, "photo": None, "start": None} for n in editors]
+    recruits = ["Pam", "Vitor"]
+    editors_all = editors + recruits
+    team_rows = ([{"id": f"t{n}", "name": n, "email": None, "user_id": None, "roles": ["Editor"], "team": "Video Production", "active": True, "slack_id": None, "photo": None, "start": None, "bootcamp_class": "Class #3" if n == "Eli" else None} for n in editors]
+                 + [{"id": f"t{n}", "name": n, "email": None, "user_id": None, "roles": ["Bootcamp Recruit"], "team": "Video Production", "active": True, "slack_id": None, "photo": None, "start": None, "bootcamp_class": "Class #5"} for n in recruits]
                  + [{"id": f"t{n}", "name": n, "email": None, "user_id": None, "roles": ["Director"], "team": "Video Production", "active": True, "slack_id": None, "photo": None, "start": None} for n in directors]
                  + [{"id": f"t{n}", "name": n, "email": None, "user_id": None, "roles": ["Social Media Manager"], "team": "Video Production", "active": True, "slack_id": None, "photo": None, "start": None} for n in posters])
     today = date.today()
@@ -388,7 +394,7 @@ def fake_snapshot() -> dict:
     chain = ["Up For Grabs", "Assigned", "Editing", "Internal Review", "Ready to Post", "Video Shipped"]
     now = datetime.utcnow()
     for n in range(900):
-        ed = rnd.choice(editors); di = rnd.choice(directors)
+        ed = rnd.choice(editors_all); di = rnd.choice(directors)
         t0 = now - timedelta(days=rnd.uniform(0, 130), hours=rnd.uniform(8, 20))
         if ed == "Dev" and (now - t0).days < 6:  # Dev is on holiday this week
             t0 -= timedelta(days=7)

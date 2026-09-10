@@ -35,6 +35,7 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px 60px}
 .toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
 h2{font-size:15px;margin:26px 0 10px;font-weight:700}
 .people{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}
+h2.grp{display:flex;align-items:baseline;gap:10px}h2.grp span{font-weight:400;color:var(--muted);font-size:12px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
 .who{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .avatar{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:14px;object-fit:cover;flex:none}
@@ -90,13 +91,14 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
   <div class="filters">
     <select id="fDays"><option value="30">Last 30 days</option><option value="60">Last 60 days</option><option value="90" selected>Last 90 days</option><option value="120">Last 120 days</option></select>
     <select id="fTeam"><option value="">All teams</option></select>
-    <select id="fRole"><option value="">All roles</option><option>Editor</option><option>Director</option><option>Social Media Manager</option><option>Bootcamp Recruit</option></select>
+    <select id="fRole"><option value="">Everyone</option><option value="Editors">Editors</option><option value="Directors">Directors</option><option value="Social">Social media</option><option value="Bootcamp">Bootcamp</option></select>
+    <select id="fClass"><option value="">All bootcamp classes</option></select>
     <label class="toggle"><input type="checkbox" id="fOthers"> Include people not in the Team table</label>
     <span class="spacer"></span>
     <label class="toggle">Day <input type="date" id="fDay"></label>
   </div>
 
-  <div id="people" class="people"></div>
+  <div id="people"></div>
 
   <h2 id="dayTitle">Day detail</h2>
   <div class="card span12" id="day"></div>
@@ -116,7 +118,8 @@ const iso = d => d.toISOString().slice(0,10);
 const addDays = (s, n) => { const d = new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return iso(d); };
 const dow = s => (new Date(s+'T00:00:00Z').getUTCDay()+6)%7; // Mon=0
 const nice = s => new Date(s+'T00:00:00Z').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
-let A = null, state = {days:90, team:'', role:'', others:false, day:null};
+let A = null, state = {days:90, team:'', role:'', klass:'', others:false, day:null};
+const GROUPS = [['Editors','Editors'],['Directors','Directors'],['Social','Social media'],['Bootcamp','Bootcamp'],['Other','Other']];
 
 function applyTheme(t){ document.documentElement.dataset.theme=t; $('#theme').textContent = t==='dark'?'Light':'Dark'; try{localStorage.setItem('gf-theme',t)}catch(e){} }
 let theme='light'; try{ theme = localStorage.getItem('gf-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); }catch(e){}
@@ -131,6 +134,8 @@ async function load(){
   $('#fDay').value = state.day; $('#fDay').max = A.today;
   const teams = [...new Set(A.people.map(p=>p.team).filter(Boolean))].sort();
   $('#fTeam').innerHTML = '<option value="">All teams</option>' + teams.map(t=>`<option ${t===state.team?'selected':''}>${esc(t)}</option>`).join('');
+  const classes = [...new Set(A.people.filter(p=>p.group==='Bootcamp').map(p=>p.bootcamp_class).filter(Boolean))].sort();
+  $('#fClass').innerHTML = '<option value="">All bootcamp classes</option>' + classes.map(c=>`<option ${c===state.klass?'selected':''}>${esc(c)}</option>`).join('');
   $('#overlay').style.display='none';
   $('#stamp').textContent = `Days in ${A.tz} · ${A.events.length.toLocaleString()} actions in range`;
   render(); loadDigest();
@@ -144,11 +149,12 @@ async function loadDigest(){
 $('#fDays').onchange = e => { state.days = +e.target.value; load(); };
 $('#fTeam').onchange = e => { state.team = e.target.value; render(); };
 $('#fRole').onchange = e => { state.role = e.target.value; render(); };
+$('#fClass').onchange = e => { state.klass = e.target.value; if (state.klass) state.role = 'Bootcamp'; $('#fRole').value = state.role; render(); };
 $('#fOthers').onchange = e => { state.others = e.target.checked; render(); };
 $('#fDay').onchange = e => { state.day = e.target.value; render(); };
 
 function people(){
-  return A.people.filter(p => (state.others || p.in_team) && (!state.team || p.team===state.team) && (!state.role || p.roles.includes(state.role)));
+  return A.people.filter(p => (state.others || p.in_team) && (!state.team || p.team===state.team) && (!state.role || p.group===state.role) && (!state.klass || p.bootcamp_class===state.klass));
 }
 function level(n){ return n===0?'':n<=2?'l1':n<=5?'l2':n<=12?'l3':'l4'; }
 function heat(p){
@@ -163,7 +169,7 @@ function heat(p){
 function statsFor(p){
   const t = p.totals; const r = p.roles;
   const s = [];
-  if (r.includes('Editor') || r.includes('Bootcamp Recruit') || (!r.length && (t.finished||t.started))) s.push(['Finished', t.finished||0], ['Started', (t.started||0)+(t.picked_up||0)], ['Revisions', t.revision_started||0]);
+  if (r.includes('Editor') || (r.includes('Bootcamp Recruit') && !r.includes('Director')) || (!r.length && (t.finished||t.started))) s.push(['Finished', t.finished||0], ['Started', (t.started||0)+(t.picked_up||0)], ['Revisions', t.revision_started||0]);
   if (r.includes('Director') || t.approved || t.sent_back) s.push(['Approved', t.approved||0], ['Sent back', t.sent_back||0]);
   if (r.includes('Social Media Manager') || t.posted) s.push(['Posts', t.posted||0]);
   if (t.created && !s.length) s.push(['Videos created', t.created]);
@@ -172,13 +178,17 @@ function statsFor(p){
 }
 function render(){
   const ps = people();
-  $('#people').innerHTML = ps.length ? ps.map(p => {
+  const card = p => {
     const initials = p.name.split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
     const av = p.photo ? `<img class="avatar" src="${esc(p.photo)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'avatar',textContent:'${initials}'}))">` : `<div class="avatar">${initials}</div>`;
     const q = p.quiet_days; const badge = q==null ? '<span class="badge">no activity loaded</span>' : q===0 ? '<span class="badge today">active today</span>' : q>=2 ? `<span class="badge quiet">quiet ${q}d</span>` : `<span class="badge">last active yesterday</span>`;
     const wip = p.in_progress.length ? `<div class="wip"><b>${p.in_progress.length} in progress:</b> ` + p.in_progress.slice(0,3).map(w => `${esc((w.title||'').slice(0,48))} <span>(${w.status}, ${w.days!=null?w.days.toFixed(0)+'d':'?'})</span>`).join(' · ') + (p.in_progress.length>3?` · +${p.in_progress.length-3} more`:'') + '</div>' : '';
-    return `<div class="card"><div class="who">${av}<div><div class="n">${esc(p.name)}</div><div class="r">${esc(p.roles.join(' · ') || 'No Team row')}${p.team?' · '+esc(p.team):''}</div></div>${badge}</div>
-      <div class="stats">${statsFor(p)}</div>${heat(p)}${wip}</div>`; }).join('') : '<div class="empty">Nobody matches these filters.</div>';
+    return `<div class="card"><div class="who">${av}<div><div class="n">${esc(p.name)}</div><div class="r">${esc(p.roles.join(' · ') || 'No Team row')}${p.bootcamp_class?' · '+esc(p.bootcamp_class):''}</div></div>${badge}</div>
+      <div class="stats">${statsFor(p)}</div>${heat(p)}${wip}</div>`; };
+  $('#people').innerHTML = ps.length ? GROUPS.map(([g, label]) => { const list = ps.filter(p=>p.group===g); if (!list.length) return '';
+      const active = list.filter(p=>p.quiet_days===0).length, quiet = list.filter(p=>p.quiet_days>=2).length;
+      return `<h2 class="grp">${label} <span>${list.length} people · ${active} active today${quiet?` · ${quiet} quiet`:''}</span></h2><div class="people">${list.map(card).join('')}</div>`; }).join('')
+    : '<div class="empty">Nobody matches these filters.</div>';
   $('#people').querySelectorAll('.c[data-day]').forEach(c => c.onclick = () => { state.day = c.dataset.day; $('#fDay').value = state.day; render(); $('#dayTitle').scrollIntoView({behavior:'smooth'}); });
   renderDay(); renderPipe();
 }
