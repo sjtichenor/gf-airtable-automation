@@ -142,6 +142,14 @@ def summary(snap: dict, days: int = 90) -> dict:
     team = people_index(snap)
     people: Dict[str, dict] = {}
 
+    def hidden(name) -> bool:
+        """Former team members (Employment Status = Inactive) stay off the page."""
+        t = team.get(name)
+        return bool(t) and not t.get("active", True)
+
+    events = [e for e in events if not (e["person"] and hidden(e["person"]))]
+    in_range = [e for e in in_range if not (e["person"] and hidden(e["person"]))]
+
     def person(name):
         if name not in people:
             t = team.get(name, {})
@@ -232,7 +240,8 @@ def digest(snap: dict, day_from, day_to=None) -> dict:
         return f"{times[0]}–{times[-1]}" if len(times) > 1 else times[0]
 
     editors, directors, social, quiet = [], [], [], []
-    names = sorted(set(by_person) | {n for n, t in team.items() if t.get("active") and roles_of(n) & WORK_ROLES})
+    names = sorted((set(by_person) | {n for n, t in team.items() if t.get("active") and roles_of(n) & WORK_ROLES})
+                   - {n for n, t in team.items() if not t.get("active", True)})
     for name in names:
         evs = by_person.get(name, [])
         r = roles_of(name)
