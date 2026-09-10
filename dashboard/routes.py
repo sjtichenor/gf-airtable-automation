@@ -80,6 +80,16 @@ def logout():
     return resp
 
 
+@router.get("/ready")
+def ready():
+    """Health check target for Render (Settings → Health Check Path =
+    /dashboard/ready). 503 until the first snapshot is in memory, so a new
+    deploy only takes traffic once it can answer without the loading screen."""
+    if cache.ready():
+        return JSONResponse({"ready": True, "generated_at": cache.snapshot.get("generated_at") if cache.snapshot else None})
+    return JSONResponse({"ready": False, "warming": True}, status_code=503)
+
+
 @router.get("/api/status")
 def status(request: Request):
     if not auth.is_authed(request):

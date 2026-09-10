@@ -11,6 +11,7 @@ import os
 import random
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -138,6 +139,28 @@ def norm_platform(value: Optional[str]) -> str:
 
 # ── Airtable ─────────────────────────────────────────────────────────────
 
+class _Pacer:
+    """Keeps every thread together under Airtable's 5 requests/second per
+    base. Tables are fetched in parallel; pages within a table are
+    sequential (offsets), so this is what bounds the build."""
+
+    def __init__(self, per_second: float = 4.5):
+        self.interval = 1.0 / per_second
+        self.next_at = 0.0
+        self.lock = threading.Lock()
+
+    def wait(self) -> None:
+        with self.lock:
+            now = time.monotonic()
+            at = max(now, self.next_at)
+            self.next_at = at + self.interval
+        if at > now:
+            time.sleep(at - now)
+
+
+_pacer = _Pacer()
+
+
 def fetch_table(table: str, field_ids: List[str], formula: Optional[str] = None) -> List[dict]:
     """All records of a table, fields keyed by id. Paces itself under the
     5 req/s base limit and waits out a 429. `formula` is an Airtable
@@ -152,6 +175,7 @@ def fetch_table(table: str, field_ids: List[str], formula: Optional[str] = None)
     offset = None
     while True:
         q = list(params) + ([("offset", offset)] if offset else [])
+        _pacer.wait()
         resp = requests.get(url, params=q, headers=headers, timeout=60)
         if resp.status_code == 429:
             log.warning("Airtable 429 on %s; sleeping 30s", table)
@@ -163,7 +187,6 @@ def fetch_table(table: str, field_ids: List[str], formula: Optional[str] = None)
         offset = body.get("offset")
         if not offset:
             return out
-        time.sleep(0.22)
 
 
 def _flatten(field_ids) -> List[str]:
@@ -192,8 +215,24 @@ def build_snapshot() -> dict:
     if not TOKEN:
         raise RuntimeError("AIRTABLE_PERSONAL_ACCESS_TOKEN is not set")
 
+    # Every table pull is independent; run them together under the pacer.
+    formula = ("OR(IS_AFTER({Start Time}, DATEADD(NOW(), -%d, 'days')), {End Time} = BLANK())" % ACTIVITY_DAYS)
+    jobs = {
+        "team": (TABLES["team"], _flatten(TE.values()), None),
+        "clients": (TABLES["clients"], [CL["name"]], None),
+        "shows": (TABLES["shows"], _flatten(SH.values()), None),
+        "channels": (TABLES["channels"], _flatten([CH["name"], CH["owned"], CH["shows"], CH["status"], CH["photo"], CH["profiles"], CH["followers"]]), None),
+        "videos": (TABLES["videos"], _flatten(VI.values()), None),
+        "posts": (TABLES["posts"], _flatten(PO.values()), None),
+        "followers": (TABLES["followers"], _flatten(FL.values()), None),
+        "status_logs": (TABLES["status_logs"], _flatten(SL.values()), formula),
+    }
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        futures = {name: pool.submit(fetch_table, *args) for name, args in jobs.items()}
+        raw = {name: f.result() for name, f in futures.items()}
+
     team_rows = []
-    for r in fetch_table(TABLES["team"], _flatten(TE.values())):
+    for r in raw["team"]:
         f = r["fields"]
         user = f.get(TE["user"]) or {}
         st = f.get(TE["status"])
@@ -220,10 +259,10 @@ def build_snapshot() -> dict:
         if not isinstance(c, dict):
             return None
         return by_user.get(c.get("id")) or by_email.get(c.get("email")) or c.get("name")
-    clients = {r["id"]: (r["fields"].get(CL["name"]) or "?") for r in fetch_table(TABLES["clients"], [CL["name"]])}
+    clients = {r["id"]: (r["fields"].get(CL["name"]) or "?") for r in raw["clients"]}
 
     shows = {}
-    for r in fetch_table(TABLES["shows"], _flatten(SH.values())):
+    for r in raw["shows"]:
         f = r["fields"]
         rel = f.get(SH["relationship"])
         shows[r["id"]] = {
@@ -235,7 +274,7 @@ def build_snapshot() -> dict:
         }
 
     channels = {}
-    for r in fetch_table(TABLES["channels"], _flatten([CH["name"], CH["owned"], CH["shows"], CH["status"], CH["photo"], CH["profiles"], CH["followers"]])):
+    for r in raw["channels"]:
         f = r["fields"]
         status = f.get(CH["status"])
         status_name = status.get("name") if isinstance(status, dict) else status
@@ -253,7 +292,7 @@ def build_snapshot() -> dict:
         }
 
     videos = {}
-    for r in fetch_table(TABLES["videos"], _flatten(VI.values())):
+    for r in raw["videos"]:
         f = r["fields"]
         vtype = f.get(VI["type"]); vstat = f.get(VI["status"]); tier = f.get(VI["tier"])
         videos[r["id"]] = {
@@ -276,7 +315,7 @@ def build_snapshot() -> dict:
         }
 
     posts = []
-    for r in fetch_table(TABLES["posts"], _flatten(PO.values())):
+    for r in raw["posts"]:
         f = r["fields"]
         vid = videos.get(_first(f.get(PO["video"])) or "", {})
         ch = _first(f.get(PO["channel"]))
@@ -305,7 +344,7 @@ def build_snapshot() -> dict:
         })
 
     followers = []
-    for r in fetch_table(TABLES["followers"], _flatten(FL.values())):
+    for r in raw["followers"]:
         f = r["fields"]
         ch = _first(f.get(FL["channel"]))
         if not ch or ch not in channels or f.get(FL["count"]) is None or not f.get(FL["date"]):
@@ -320,9 +359,8 @@ def build_snapshot() -> dict:
 
     # Status history: only the recent window plus anything still open. The
     # table is 25k+ rows and growing; filterByFormula needs field names.
-    formula = ("OR(IS_AFTER({Start Time}, DATEADD(NOW(), -%d, 'days')), {End Time} = BLANK())" % ACTIVITY_DAYS)
     status_logs = []
-    for r in fetch_table(TABLES["status_logs"], _flatten(SL.values()), formula=formula):
+    for r in raw["status_logs"]:
         f = r["fields"]
         vid = _first(f.get(SL["video"]))
         st = f.get(SL["status"])
@@ -452,6 +490,8 @@ class Cache:
         self.snapshot: Optional[dict] = None
         self.last_error: Optional[str] = None
         self.refreshing = False
+        self.started_at = time.time()
+        self.attempts = 0
         self.lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
 
@@ -473,6 +513,13 @@ class Cache:
             log.exception("dashboard refresh failed")
         finally:
             self.refreshing = False
+            self.attempts += 1
+
+    def ready(self) -> bool:
+        """Render's health check: keep the previous instance serving until
+        this one has data. Gives up gating after the first failed attempt
+        or five minutes, so a broken Airtable token cannot wedge deploys."""
+        return self.snapshot is not None or self.attempts > 0 or time.time() - self.started_at > 300
 
     def _loop(self) -> None:
         while True:
@@ -491,6 +538,7 @@ class Cache:
             "generated_at": self.snapshot.get("generated_at") if self.snapshot else None,
             "last_error": self.last_error,
             "refresh_seconds": REFRESH_SECONDS,
+            "uptime_seconds": round(time.time() - self.started_at),
         }
 
 
