@@ -40,6 +40,7 @@ HISTORY = os.environ.get("SB_HISTORY", "archive")
 PLATFORMS = [p.strip() for p in os.environ.get("SB_PLATFORMS", "instagram,tiktok,twitter,facebook").split(",") if p.strip()]
 MAX_PROFILES = int(os.environ.get("SB_MAX_PROFILES", "200"))
 ONLY = os.environ.get("SB_ONLY", "").strip().lower()
+MIN_CREDITS = int(os.environ.get("SB_MIN_CREDITS", "30"))  # stop before the balance drops below this
 F_NOTES = "Notes"
 NOTE = "Social Blade backfill"
 
@@ -176,11 +177,13 @@ def probe():
 def run():
     today = date.today()
     pulled = created = skipped = 0
+    tracked, untracked, stop = [], [], False
     for ch in channels():
         cid, name = ch["id"], ch["fields"].get(CHANNEL_NAME)
         for platform in PLATFORMS:
-            if pulled >= MAX_PROFILES:
-                print(f"cap of {MAX_PROFILES} profiles reached")
+            if pulled >= MAX_PROFILES or stop:
+                print(f"stopping: {'credit floor' if stop else f'cap of {MAX_PROFILES} profiles'} reached")
+                summary(pulled, created, skipped, tracked, untracked)
                 return
             url_field, label = PLATFORM_MAP[platform]
             handle = handle_from_url(platform, ch["fields"].get(url_field))
@@ -191,10 +194,19 @@ def run():
             ok = isinstance(body, dict) and (body.get("status") or {}).get("success", code == 200)
             rows = daily_rows(body) if ok else []
             credits = ((body.get("info") or {}).get("credits") or {}) if isinstance(body, dict) else {}
+            left = credits.get("available")
             if not rows:
-                print(f"  {name} / {label} ({handle}): HTTP {code}, no daily rows; status={json.dumps((body or {}).get('status'))[:200]}")
+                print(f"  {name} / {label} ({handle}): HTTP {code}, no daily rows; status={json.dumps((body or {}).get('status'))[:200]}; credits left: {left}")
                 skipped += 1
                 continue
+            if len(rows) <= 2:
+                # Social Blade only started tracking this account now: nothing to back-fill.
+                untracked.append(f"{name} / {label}")
+            else:
+                tracked.append(f"{name} / {label} ({rows[0][0]} → {rows[-1][0]}, {len(rows)} days)")
+            if isinstance(left, int) and left < MIN_CREDITS:
+                print(f"  credits left {left} < SB_MIN_CREDITS {MIN_CREDITS}; stopping after this profile")
+                stop = True
             have = existing_dates(cid, label)
             kept = [(d, n) for d, n in thin(rows, today) if d not in have]
             prev = None
@@ -212,7 +224,17 @@ def run():
             created += len(batch)
             print(f"  {name} / {label} ({handle}): {len(rows)} days from Social Blade, {len(batch)} rows written"
                   f" ({rows[0][0]} → {rows[-1][0]}); credits left: {credits.get('available', '?')}")
+    summary(pulled, created, skipped, tracked, untracked)
+
+
+def summary(pulled, created, skipped, tracked, untracked):
     print(f"done: {pulled} profiles pulled, {created} rows created, {skipped} profiles without data")
+    print(f"had history on Social Blade ({len(tracked)}):")
+    for t in tracked:
+        print("   " + t)
+    print(f"only tracked from today ({len(untracked)}):")
+    for u in untracked:
+        print("   " + u)
 
 
 def main():
