@@ -213,7 +213,9 @@ def _client_show(slug: str):
     if slug not in auth.client_passwords():
         return None
     if cache.snapshot is None:
-        return {"name": slug.replace("-", " ").title(), "warming": True}
+        from .data import client_groups
+        g = client_groups().get(slug)
+        return {"name": g["name"] if g else slug.replace("-", " ").title(), "warming": True}
     view = client_view(cache.snapshot, slug)
     return view["client"] if view else None
 

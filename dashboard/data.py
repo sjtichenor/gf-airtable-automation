@@ -555,31 +555,61 @@ def slugify(name: str) -> str:
     return "-".join(w for w in "".join(c.lower() if c.isalnum() else " " for c in (name or "")).split())
 
 
+def client_groups() -> Dict[str, dict]:
+    """Clients defined as a set of accounts rather than a show.
+    CLIENT_GROUPS = "ffp=FFP:Steelman|US In Common;other=Name:Account A|Account B"
+    (slug = display name : channel names separated by |)."""
+    out: Dict[str, dict] = {}
+    for part in os.environ.get("CLIENT_GROUPS", "").split(";"):
+        if "=" not in part:
+            continue
+        slug, rest = part.split("=", 1)
+        name, _, chans = rest.partition(":")
+        names = [c.strip().lower() for c in chans.split("|") if c.strip()]
+        if slug.strip() and names:
+            out[slug.strip().lower()] = {"name": name.strip() or slug.strip(), "channels": names}
+    return out
+
+
 def client_view(snap: dict, slug: str) -> Optional[dict]:
-    """The slice of the snapshot one client may see: their show, the
-    channels linked to it, posts on those channels (or cut from that
-    show's episodes) and those channels' follower history. Internal
-    attribution — editor, director, poster, client account — is removed
-    before anything leaves the server."""
-    show = next((sh for sh in snap.get("shows", []) if slugify(sh["name"]) == slug), None)
-    if not show:
-        return None
-    channels = [dict(c, shows=[show["id"]]) for c in snap.get("channels", []) if show["id"] in c.get("shows", [])]
-    channel_ids = {c["id"] for c in channels}
+    """The slice of the snapshot one client may see. A client is either a
+    show (slug = slugified show name: that show, the channels linked to it,
+    posts on those channels or cut from its episodes) or a CLIENT_GROUPS
+    entry (a named set of accounts: exactly those channels and their posts).
+    Either way, internal attribution — editor, director, poster, client
+    account — is removed before anything leaves the server."""
     keep = ("id", "url", "platform", "channel", "show", "title", "hook", "type", "date", "date_estimated", "created",
             "views", "likes", "comments", "replays", "reach")
-    posts = [{k: p.get(k) for k in keep}
-             for p in snap.get("posts", [])
-             if (p.get("channel") in channel_ids) or (p.get("show") == show["name"])]
-    for p in posts:
-        if p["channel"] not in channel_ids:
-            p["channel"] = None
-        p["show"] = show["name"]
+    group = client_groups().get(slug)
+    if group:
+        channels = [dict(c) for c in snap.get("channels", []) if c["name"].lower() in group["channels"]]
+        if not channels:
+            return None
+        channel_ids = {c["id"] for c in channels}
+        show_ids = {sid for c in channels for sid in c.get("shows", [])}
+        shows = [sh for sh in snap.get("shows", []) if sh["id"] in show_ids]
+        posts = [{k: p.get(k) for k in keep} for p in snap.get("posts", []) if p.get("channel") in channel_ids]
+        name, logo = group["name"], next((c.get("photo") for c in channels if c.get("photo")), None)
+        primary = shows
+    else:
+        show = next((sh for sh in snap.get("shows", []) if slugify(sh["name"]) == slug), None)
+        if not show:
+            return None
+        channels = [dict(c, shows=[show["id"]]) for c in snap.get("channels", []) if show["id"] in c.get("shows", [])]
+        channel_ids = {c["id"] for c in channels}
+        posts = [{k: p.get(k) for k in keep}
+                 for p in snap.get("posts", [])
+                 if (p.get("channel") in channel_ids) or (p.get("show") == show["name"])]
+        for p in posts:
+            if p["channel"] not in channel_ids:
+                p["channel"] = None
+            p["show"] = show["name"]
+        name, logo, primary = show["name"], show.get("logo"), [show]
     followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
     return {
         "generated_at": snap.get("generated_at"),
-        "client": {"slug": slug, "name": show["name"], "logo": show.get("logo")},
-        "shows": [show],
+        "client": {"slug": slug, "name": name, "logo": logo},
+        "shows": primary,
         "channels": channels,
         "posts": posts,
         "followers": followers,
