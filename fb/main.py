@@ -1,4 +1,5 @@
 # import os
+import sys
 # import json
 # import requests
 # import re
@@ -1436,6 +1437,15 @@ def main():
     
     # Run complete Facebook sync (posts + followers)
     sync.sync_all_facebook()
+
+    # Weekly Instagram audience demographics ride along on this service
+    # because it already holds the Meta page tokens.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from insta import demographics
+        demographics.run_if_due()
+    except Exception as exc:
+        print(f"demographics step failed: {exc}")
 
 if __name__ == "__main__":
     main()

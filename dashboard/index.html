@@ -114,6 +114,14 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
     <div class="card span6"><h3>Posting volume</h3><div class="sub">Posts per week, with average views per post</div><div class="chart"><canvas id="cVolume"></canvas></div></div>
     <div class="card span6"><h3 id="showsTitle">Views by show</h3><div class="sub" id="showsSub">Top shows in the selected range</div><div class="chart"><canvas id="cShows"></canvas></div></div>
 
+    <div class="card span12" id="audienceCard"><h3>Audience</h3><div class="sub" id="audienceSub">Instagram follower demographics for the selected accounts, latest weekly pull</div>
+      <div class="grid" style="margin-top:6px">
+        <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Age</h3><div class="chart" style="height:200px"><canvas id="cAge"></canvas></div></div>
+        <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Gender</h3><div class="chart" style="height:200px"><canvas id="cGender"></canvas></div></div>
+        <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Top countries</h3><div class="chart" style="height:200px"><canvas id="cCountry"></canvas></div></div>
+        <div class="span12"><h3 style="font-size:12px;color:var(--muted)">Top cities</h3><div class="tablewrap" style="max-height:260px"><table id="tCity"></table></div></div>
+      </div>
+    </div>
     <div class="card span12"><h3>Accounts</h3><div class="sub">Follower count is the latest snapshot; changes compare against the snapshot nearest the start of each window</div><div class="tablewrap"><table id="tAccounts"></table></div></div>
     <div class="card span6" id="editorsCard"><h3>Editors</h3><div class="sub">Clips posted in the range, by the editor who cut them</div><div class="tablewrap"><table id="tEditors"></table></div></div>
     <div class="card span6" id="topCard"><h3>Top posts</h3><div class="sub">Most viewed in the selected range</div><div class="tablewrap"><table id="tTop"></table></div></div>
@@ -278,7 +286,7 @@ function render(){
   $('#kpis').innerHTML = kp.map(([l,v,d]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
 
   renderFollowers(sel, series); renderNet(sel, series); renderViewsWeek(posts, start, end); renderDonut(posts); renderVolume(posts, start, end); renderShows(posts);
-  renderAccounts(sel, series); if (!CLIENT) renderEditors(posts); renderTop(posts);
+  renderAccounts(sel, series); if (!CLIENT) renderEditors(posts); renderTop(posts); renderAudience();
   $('#stamp').textContent = 'Data as of ' + new Date(DATA.generated_at).toLocaleString() + (DATA.build_seconds ? ` · pulled in ${DATA.build_seconds}s` : '');
   $('#foot').textContent = (CLIENT ? `${MODE.name} · ` : '') + `${full(DATA.posts.length)} posts, ${full(DATA.followers.length)} follower snapshots and ${DATA.channels.length} accounts loaded. Follower history starts ${DATA.followers.length ? DATA.followers.map(f=>f.date).reduce((a,b)=>a<b?a:b) : '—'}; views are lifetime totals per post as last synced.` + (CLIENT ? ' Prepared by Good Future Media.' : '');
 }
@@ -340,6 +348,32 @@ function renderShows(posts){
   const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
   line('cShows', {type:'bar', data:{labels: rows.map(r=>r[0]), datasets:[{data: rows.map(r=>r[1]), backgroundColor:accent, borderRadius:4, barThickness:14}]},
     options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${full(c.parsed.x)} views`}}}, scales:{x:{ticks:{callback:fmt}}, y:{grid:{display:false}}}}});
+}
+
+// ── audience ───────────────────────────────────────────────────────────
+const COUNTRY = {US:'United States',GB:'United Kingdom',CA:'Canada',IN:'India',AU:'Australia',DE:'Germany',BR:'Brazil',FR:'France',MX:'Mexico',NL:'Netherlands',ES:'Spain',IT:'Italy',PH:'Philippines',NG:'Nigeria',PK:'Pakistan',ID:'Indonesia',AE:'United Arab Emirates',SG:'Singapore',IE:'Ireland',SE:'Sweden',CH:'Switzerland',ZA:'South Africa',NZ:'New Zealand',TR:'Türkiye',AR:'Argentina',CO:'Colombia',JP:'Japan',KR:'South Korea',IL:'Israel',PL:'Poland',PT:'Portugal',BE:'Belgium',AT:'Austria',NO:'Norway',DK:'Denmark',SA:'Saudi Arabia',EG:'Egypt',VN:'Vietnam',TH:'Thailand',MY:'Malaysia',CL:'Chile',PE:'Peru',BD:'Bangladesh',KE:'Kenya',RO:'Romania',CZ:'Czechia',GR:'Greece',HU:'Hungary',UA:'Ukraine'};
+function renderAudience(){
+  const rows = (DATA.demographics||[]).filter(d => channelOk(byId[d.channel]) && d.platform==='Instagram');
+  const card = $('#audienceCard');
+  if (!rows.length) { card.style.display='none'; return; }
+  card.style.display='';
+  const chans = new Set(rows.map(r=>r.channel));
+  $('#audienceSub').textContent = `Instagram follower demographics across ${chans.size} account${chans.size===1?'':'s'}, week of ${[...new Set(rows.map(r=>r.week))].sort().pop()}`;
+  const agg = dim => { const m = {}; rows.filter(r=>r.dimension===dim).forEach(r => m[r.segment] = (m[r.segment]||0) + r.followers); return m; };
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const age = agg('Age'); const ageOrder = ['13-17','18-24','25-34','35-44','45-54','55-64','65+']; const ageLabels = ageOrder.filter(a=>age[a]!=null).concat(Object.keys(age).filter(a=>!ageOrder.includes(a)));
+  const ageTotal = Object.values(age).reduce((a,b)=>a+b,0) || 1;
+  line('cAge', {type:'bar', data:{labels: ageLabels, datasets:[{data: ageLabels.map(a=>age[a]/ageTotal*100), backgroundColor:accent, borderRadius:4}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${c.parsed.y.toFixed(1)}% · ${full(age[c.label])}`}}}, scales:{y:{ticks:{callback:v=>v+'%'}}, x:{grid:{display:false}}}}});
+  const g = agg('Gender'); const gl = Object.keys(g).sort((a,b)=>g[b]-g[a]);
+  line('cGender', {type:'doughnut', data:{labels:gl, datasets:[{data: gl.map(k=>g[k]), backgroundColor:['#2563eb','#db2777','#9ca3af','#f59e0b'], borderWidth:0}]},
+    options:{responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{legend, tooltip:{callbacks:{label: c => { const t = c.dataset.data.reduce((a,b)=>a+b,0); return ` ${c.label}: ${(c.parsed/t*100).toFixed(1)}% · ${full(c.parsed)}`; }}}}}});
+  const co = agg('Country'); const cl = Object.keys(co).sort((a,b)=>co[b]-co[a]).slice(0,8); const coTotal = Object.values(co).reduce((a,b)=>a+b,0) || 1;
+  line('cCountry', {type:'bar', data:{labels: cl.map(c=>COUNTRY[c]||c), datasets:[{data: cl.map(c=>co[c]/coTotal*100), backgroundColor:accent, borderRadius:4, barThickness:12}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${c.parsed.x.toFixed(1)}% · ${full(co[cl[c.dataIndex]])}`}}}, scales:{x:{ticks:{callback:v=>v+'%'}}, y:{grid:{display:false}}}}});
+  const ci = agg('City'); const ciTotal = Object.values(agg('Gender')).reduce((a,b)=>a+b,0) || Object.values(ci).reduce((a,b)=>a+b,0) || 1;
+  const cityRows = Object.keys(ci).sort((a,b)=>ci[b]-ci[a]).slice(0,12).map(k => ({city:k, followers:ci[k], share: ci[k]/ciTotal*100}));
+  table('tCity', [{h:'City', k:'city'}, {h:'Followers', k:'followers', n:true}, {h:'Share', k:'share', n:true, f: r => r.share.toFixed(1)+'%'}], cityRows, {k:'followers', d:'desc'});
 }
 
 // ── tables ─────────────────────────────────────────────────────────────

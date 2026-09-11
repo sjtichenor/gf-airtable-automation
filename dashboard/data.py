@@ -37,6 +37,7 @@ TABLES = {
     "team": "tblSZz4LUOn5tB4ZT",
     "clients": "tblYF8v9O280SU2oB",
     "status_logs": "tblnPcYMXNYwLkpYD",
+    "demographics": "tblG4ElwziblQZM9E",
 }
 ACTIVITY_DAYS = int(os.environ.get("DASHBOARD_ACTIVITY_DAYS", "120"))
 
@@ -115,6 +116,14 @@ FL = {
     "date": "fld1JmpcbEVXEL3f5",      # Date
     "count": "flddzOdphxZnvDKDZ",     # Follower Count
     "prev": "fldT0GzajOXGarc4T",      # Previous Count
+}
+DM = {
+    "channel": "flddkaLHNlpAowbny",   # Social Media Account
+    "platform": "fldmZNYRKF2s6hK1R",  # Platform
+    "dimension": "fldeWhYpXmKBtxrpn", # Dimension
+    "segment": "fldwi2ZU45kYJMgjG",   # Segment
+    "followers": "fld4AtOLwZ6YZTrye", # Followers
+    "week": "fldk2CxcRNWbFqMnX",      # Week
 }
 TE = {
     "name": "fldbUkybFQu3SyAFI",      # Name (formula)
@@ -226,6 +235,7 @@ def build_snapshot() -> dict:
         "posts": (TABLES["posts"], _flatten(PO.values()), None),
         "followers": (TABLES["followers"], _flatten(FL.values()), None),
         "status_logs": (TABLES["status_logs"], _flatten(SL.values()), formula),
+        "demographics": (TABLES["demographics"], _flatten(DM.values()), None),
     }
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = {name: pool.submit(fetch_table, *args) for name, args in jobs.items()}
@@ -384,10 +394,30 @@ def build_snapshot() -> dict:
     for c in channels.values():
         c["shows"] = [sid for sid in c["shows"] if sid in shows]
 
+    # Audience demographics: keep each account/platform's latest week only.
+    latest: Dict[tuple, str] = {}
+    demo_rows = []
+    for r in raw["demographics"]:
+        f = r["fields"]
+        ch = _first(f.get(DM["channel"]))
+        wk = f.get(DM["week"])
+        if not ch or ch not in channels or not wk:
+            continue
+        plat = f.get(DM["platform"]); dim = f.get(DM["dimension"])
+        plat = plat.get("name") if isinstance(plat, dict) else plat
+        dim = dim.get("name") if isinstance(dim, dict) else dim
+        demo_rows.append({"channel": ch, "platform": plat, "dimension": dim, "segment": f.get(DM["segment"]),
+                          "followers": f.get(DM["followers"]) or 0, "week": wk})
+        key = (ch, plat)
+        if wk > latest.get(key, ""):
+            latest[key] = wk
+    demographics = [d for d in demo_rows if latest.get((d["channel"], d["platform"])) == d["week"]]
+
     return {
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "shows": list(shows.values()),
         "channels": list(channels.values()),
+        "demographics": demographics,
         "team": team_rows,
         "videos": list(videos.values()),
         "status_logs": status_logs,
@@ -482,8 +512,21 @@ def fake_snapshot() -> dict:
             "views": views, "likes": int(views * rnd.uniform(0.01, 0.08)),
             "comments": int(views * rnd.uniform(0, 0.004)), "replays": None, "reach": None,
         })
+    demographics = []
+    for ch in channels:
+        if "Instagram" not in ch["followers"]:
+            continue
+        total = ch["followers"]["Instagram"]
+        for seg, share in [("18-24", .22), ("25-34", .38), ("35-44", .22), ("45-54", .11), ("55-64", .05), ("65+", .02)]:
+            demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "Age", "segment": seg, "followers": int(total * share * rnd.uniform(.8, 1.2)), "week": today.isoformat()})
+        for seg, share in [("Men", .64), ("Women", .34), ("Unknown", .02)]:
+            demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "Gender", "segment": seg, "followers": int(total * share), "week": today.isoformat()})
+        for seg, share in [("US", .48), ("GB", .09), ("CA", .07), ("IN", .06), ("AU", .04), ("DE", .03), ("BR", .03)]:
+            demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "Country", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
+        for seg, share in [("New York, New York", .08), ("Los Angeles, California", .06), ("London, England", .05), ("San Francisco, California", .04), ("Toronto, Ontario", .03), ("Chicago, Illinois", .02)]:
+            demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "City", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-            "shows": shows, "channels": channels, "team": team_rows, "videos": videos, "status_logs": status_logs,
+            "shows": shows, "channels": channels, "demographics": demographics, "team": team_rows, "videos": videos, "status_logs": status_logs,
             "posts": posts, "followers": followers}
 
 
@@ -606,11 +649,13 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
             p["show"] = show["name"]
         name, logo, primary = show["name"], show.get("logo"), [show]
     followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
+    demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     return {
         "generated_at": snap.get("generated_at"),
         "client": {"slug": slug, "name": name, "logo": logo},
         "shows": primary,
         "channels": channels,
+        "demographics": demographics,
         "posts": posts,
         "followers": followers,
     }
