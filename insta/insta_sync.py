@@ -1203,6 +1203,8 @@ class InstagramDynamicSync:
                 'Reach': metrics['reach'],
                 'Likes': metrics['likes']
             }
+            if 'views_incl_facebook' in metrics:
+                update_fields['Views incl. Facebook'] = metrics['views_incl_facebook']
 
             if 'timestamp' in metrics and metrics['timestamp']:
                 if current_date_posted:
@@ -1368,6 +1370,21 @@ class InstagramDynamicSync:
             found_media_id, page_data['page_access_token'], timestamp=found_timestamp
         )
 
+        # A reel shared to Facebook reports Instagram + Facebook views as one
+        # number. If this video also has a Facebook post, keep the raw figure
+        # in "Views incl. Facebook" and store the Instagram-only count in Views
+        # so the two records add up instead of double counting.
+        video_ids = fields.get('Video') or []
+        sibling = getattr(self, 'fb_by_video', {}).get(video_ids[0]) if video_ids else None
+        if metrics and sibling and metrics.get('views'):
+            fb_views = self.facebook_views_now(sibling, page_data['page_access_token'])
+            if fb_views is None:
+                fb_views = sibling.get('views') or 0
+            raw = metrics['views']
+            metrics['views_incl_facebook'] = raw
+            metrics['views'] = max(raw - fb_views, 0)
+            print(f"   Shared to Facebook: raw {raw}, Facebook {fb_views}, Instagram-only {metrics['views']}")
+
         if metrics:
             success = self.update_post_record(record_id, metrics, current_date_posted=current_date_posted)
             if success:
@@ -1380,6 +1397,48 @@ class InstagramDynamicSync:
             print(f"   Could not fetch metrics")
             return False
 
+    def facebook_posts_by_video(self):
+        """Facebook post per Video record, so an Instagram reel that was
+        shared to Facebook can have those views taken back out. Instagram's
+        `views` metric counts Facebook plays for cross-posted reels; the app
+        shows the split, the API does not."""
+        out = {}
+        offset = None
+        while True:
+            params = {'pageSize': 100, 'filterByFormula': "{Social Network}='Facebook'",
+                      'fields[]': ['Link to Post', 'Views', 'Video']}
+            if offset:
+                params['offset'] = offset
+            r = requests.get(self.posts_table_url, headers=self.airtable_headers, params=params)
+            if r.status_code != 200:
+                print(f"Could not load Facebook posts for cross-post check: {r.status_code}")
+                return out
+            body = r.json()
+            for rec in body.get('records', []):
+                f = rec['fields']
+                for vid in f.get('Video') or []:
+                    out[vid] = {'url': f.get('Link to Post', ''), 'views': f.get('Views'), 'record_id': rec['id']}
+            offset = body.get('offset')
+            if not offset:
+                return out
+            time.sleep(0.2)
+
+    def facebook_views_now(self, fb_post, page_access_token):
+        """Current view count of the sibling Facebook reel, read live so the
+        subtraction uses the same moment as the Instagram figure."""
+        m = re.search(r'/(?:reel|videos)/(\d+)', fb_post.get('url') or '')
+        if not m:
+            return None
+        try:
+            r = requests.get(f"{self.meta_base_url}/{m.group(1)}",
+                             params={'fields': 'views', 'access_token': page_access_token}, timeout=30)
+            if r.status_code == 200:
+                v = r.json().get('views')
+                return int(v) if v is not None else None
+        except Exception as exc:
+            print(f"      Facebook sibling lookup failed: {exc}")
+        return None
+
     def sync_instagram_posts(self):
         """Main function to sync Instagram post metrics"""
         print("Starting Instagram Posts Sync...")
@@ -1387,6 +1446,9 @@ class InstagramDynamicSync:
         if not self.build_instagram_mapping():
             print("Failed to build Instagram mapping")
             return
+
+        self.fb_by_video = self.facebook_posts_by_video()
+        print(f"Facebook posts on file for cross-post check: {len(self.fb_by_video)}")
 
         print("\nFetching Instagram posts from Airtable...")
         instagram_posts = self.get_instagram_posts_from_airtable()
