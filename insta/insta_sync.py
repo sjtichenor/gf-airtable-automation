@@ -1142,7 +1142,8 @@ class InstagramDynamicSync:
                     result = {
                         'views': metrics.get('views', metrics.get('impressions', 0)),  # photos use impressions
                         'reach': metrics.get('reach', 0),
-                        'likes': metrics.get('likes', 0)
+                        'likes': metrics.get('likes', 0),
+                        'comments': metrics.get('comments'),  # requested all along, never stored until 2026-09-16
                     }
 
                     if timestamp:
@@ -1203,6 +1204,8 @@ class InstagramDynamicSync:
                 'Reach': metrics['reach'],
                 'Likes': metrics['likes']
             }
+            if metrics.get('comments') is not None:
+                update_fields['Comments'] = metrics['comments']
 
             if 'timestamp' in metrics and metrics['timestamp']:
                 if current_date_posted:
