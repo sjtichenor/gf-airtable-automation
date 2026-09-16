@@ -80,6 +80,9 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 .kpi.click,.chart.click canvas,tr.click{cursor:pointer}
 .kpi.click:hover{border-color:var(--accent)}
 .hint{font-size:11px;color:var(--muted2);margin-left:6px}
+.info{position:relative;display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--muted2);color:var(--muted);font-size:10px;font-weight:700;font-style:normal;cursor:help;vertical-align:middle;margin-left:4px;line-height:1}
+.info .tip{display:none;position:absolute;left:50%;top:22px;transform:translateX(-50%);width:280px;padding:10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);color:var(--text);font-size:12px;font-weight:400;line-height:1.45;text-align:left;z-index:6;white-space:normal}
+.info:hover .tip,.info:focus .tip{display:block}
 </style>
 </head>
 <body>
@@ -129,7 +132,7 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
     <div class="card span12" id="audienceCard"><h3>Audience</h3><div class="sub" id="audienceSub">Instagram follower demographics for the selected accounts, latest weekly pull</div>
       <div class="grid" style="margin-top:6px">
         <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Age</h3><div class="chart" style="height:200px"><canvas id="cAge"></canvas></div></div>
-        <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Gender</h3><div class="chart" style="height:200px"><canvas id="cGender"></canvas></div></div>
+        <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Gender <span class="info" tabindex="0" aria-label="About the Not specified group">i<span class="tip">"Not specified" is Instagram's own bucket for followers who never set a gender. It includes every business, brand and creator account that follows this page, plus people who skipped the field. A share of 10 to 25 percent is normal for an account followed by companies and founders.</span></span></h3><div class="chart" style="height:200px"><canvas id="cGender"></canvas></div></div>
         <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Top countries</h3><div class="chart" style="height:200px"><canvas id="cCountry"></canvas></div></div>
         <div class="span12"><h3 style="font-size:12px;color:var(--muted)">Top cities</h3><div class="tablewrap" style="max-height:260px"><table id="tCity"></table></div></div>
       </div>
