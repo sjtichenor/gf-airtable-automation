@@ -391,7 +391,8 @@ function renderAudience(){
   line('cAge', {type:'bar', data:{labels: ageLabels, datasets:[{data: ageLabels.map(a=>age[a]/ageTotal*100), backgroundColor:accent, borderRadius:4}]},
     options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${c.parsed.y.toFixed(1)}% · ${full(age[c.label])}`}}}, scales:{y:{ticks:{callback:v=>v+'%'}}, x:{grid:{display:false}}}}});
   const g = agg('Gender'); const gl = Object.keys(g).sort((a,b)=>g[b]-g[a]);
-  line('cGender', {type:'doughnut', data:{labels:gl, datasets:[{data: gl.map(k=>g[k]), backgroundColor:['#2563eb','#db2777','#9ca3af','#f59e0b'], borderWidth:0}]},
+  const GCOLOR = {Men:'#2563eb', Women:'#db2777', Unknown:'#9ca3af'};
+  line('cGender', {type:'doughnut', data:{labels:gl.map(k => k==='Unknown' ? 'Not specified' : k), datasets:[{data: gl.map(k=>g[k]), backgroundColor:gl.map(k => GCOLOR[k] || '#f59e0b'), borderWidth:0}]},
     options:{responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{legend, tooltip:{callbacks:{label: c => { const t = c.dataset.data.reduce((a,b)=>a+b,0); return ` ${c.label}: ${(c.parsed/t*100).toFixed(1)}% · ${full(c.parsed)}`; }}}}}});
   const co = agg('Country'); const cl = Object.keys(co).sort((a,b)=>co[b]-co[a]).slice(0,8); const coTotal = Object.values(co).reduce((a,b)=>a+b,0) || 1;
   line('cCountry', {type:'bar', data:{labels: cl.map(c=>COUNTRY[c]||c), datasets:[{data: cl.map(c=>co[c]/coTotal*100), backgroundColor:accent, borderRadius:4, barThickness:12}]},
