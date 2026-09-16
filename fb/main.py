@@ -1447,5 +1447,12 @@ def main():
     except Exception as exc:
         print(f"demographics step failed: {exc}")
 
+    # Daily account-level reach and views ride along too (same page tokens)
+    try:
+        from insta import account_insights
+        account_insights.run_if_enabled()
+    except Exception as exc:
+        print(f"account insights step failed: {exc}")
+
 if __name__ == "__main__":
     main()
