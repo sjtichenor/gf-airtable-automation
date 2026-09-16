@@ -72,9 +72,21 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
 #overlay b{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
 .avatar{width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:8px;object-fit:cover;background:var(--chip)}
 .foot{margin-top:24px;color:var(--muted2);font-size:12px}
+.drawer{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px}
+.drawer[hidden]{display:none}
+.drawer-card{background:var(--card);border:1px solid var(--border);border-radius:16px;width:min(1100px,100%);box-shadow:0 30px 80px rgba(0,0,0,.4);padding:16px 18px}
+.drawer-h{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.drawer-h h3{margin:0;font-size:15px}
+.kpi.click,.chart.click canvas,tr.click{cursor:pointer}
+.kpi.click:hover{border-color:var(--accent)}
+.hint{font-size:11px;color:var(--muted2);margin-left:6px}
 </style>
 </head>
 <body>
+<div id="drawer" class="drawer" hidden><div class="drawer-card">
+  <div class="drawer-h"><div><h3 id="drawerTitle"></h3><div class="sub" id="drawerSub"></div></div><button class="ghost" id="drawerClose">Close</button></div>
+  <div class="tablewrap" style="max-height:70vh"><table id="tDrill"></table></div>
+</div></div>
 <div id="overlay"><div><b>Loading analytics</b><span id="ovmsg">Fetching the latest snapshot…</span></div></div>
 <header><div class="bar">
   <div class="brand"><span class="dot"></span>Good Future Media<span class="sub">Analytics</span></div>
@@ -108,7 +120,7 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
     <div class="card span8"><h3>Followers over time</h3><div class="sub" id="followersSub"></div><div class="chart tall"><canvas id="cFollowers"></canvas></div></div>
     <div class="card span4"><h3>Net follower change per day</h3><div class="sub">Gains minus losses across the selection</div><div class="chart tall"><canvas id="cNet"></canvas></div></div>
 
-    <div class="card span8"><h3>Views by week posted</h3><div class="sub">Lifetime views of clips, grouped by the week they went out</div><div class="chart"><canvas id="cViewsWeek"></canvas></div></div>
+    <div class="card span8"><h3>Views by week posted</h3><div class="sub">Lifetime views of clips, grouped by the week they went out · click a bar for the posts</div><div class="chart"><canvas id="cViewsWeek"></canvas></div></div>
     <div class="card span4"><h3>Views by platform</h3><div class="sub">Share of views in the selected range</div><div class="chart"><canvas id="cDonut"></canvas></div></div>
 
     <div class="card span6"><h3>Posting volume</h3><div class="sub">Posts per week, with average views per post</div><div class="chart"><canvas id="cVolume"></canvas></div></div>
@@ -122,7 +134,7 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
         <div class="span12"><h3 style="font-size:12px;color:var(--muted)">Top cities</h3><div class="tablewrap" style="max-height:260px"><table id="tCity"></table></div></div>
       </div>
     </div>
-    <div class="card span12"><h3>Accounts</h3><div class="sub">Follower count is the latest snapshot; changes compare against the snapshot nearest the start of each window</div><div class="tablewrap"><table id="tAccounts"></table></div></div>
+    <div class="card span12"><h3>Accounts</h3><div class="sub">Follower count is the latest snapshot; changes compare against the snapshot nearest the start of each window · click a row for its posts</div><div class="tablewrap"><table id="tAccounts"></table></div></div>
     <div class="card span6" id="editorsCard"><h3>Editors</h3><div class="sub">Clips posted in the range, by the editor who cut them</div><div class="tablewrap"><table id="tEditors"></table></div></div>
     <div class="card span6" id="topCard"><h3>Top posts</h3><div class="sub">Most viewed in the selected range</div><div class="tablewrap"><table id="tTop"></table></div></div>
   </div>
@@ -159,8 +171,9 @@ const iso = d => d.toISOString().slice(0,10);
 const addDays = (s, n) => { const d = new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return iso(d); };
 const weekStart = s => { const d = new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - (d.getUTCDay()+6)%7); return iso(d); };
 const monthLabel = s => new Date(s+'T00:00:00Z').toLocaleDateString(undefined,{month:'short',day:'numeric',timeZone:'UTC'});
+const nice = s => new Date(s+'T00:00:00Z').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
 
-let DATA = null, charts = {}, state = {show:'', channel:'', editor:'', range:'90', platforms:new Set(PORDER), owned:false, sort:{}};
+let DATA = null, charts = {}, CUR = {posts:[]}, state = {show:'', channel:'', editor:'', range:'90', platforms:new Set(PORDER), owned:false, sort:{}};
 const byId = {};
 
 // ── theme ──────────────────────────────────────────────────────────────
@@ -275,15 +288,22 @@ function render(){
   const sum = k => posts.reduce((a,p)=>a+(p[k]||0),0);
   const views = sum('views'), likes = sum('likes'), comments = sum('comments');
   const dated = posts.filter(p=>p.date);
+  CUR = {posts, start, end};
   const kp = [
-    ['Followers', fmt(now), anySeries ? deltaHtml(fDelta, haveThen ? pct(now, then) : null) : '<span class="d">no snapshots yet</span>'],
-    ['Posts', full(posts.length), `<span class="d">${(posts.length/Math.max(1,(new Date(end)-new Date(start))/864e5/7)).toFixed(1)+' per week'}${posts.some(p=>p.date_estimated) ? ' · '+full(posts.filter(p=>p.date_estimated).length)+' dated by log entry' : ''}</span>`],
-    ['Views', fmt(views), `<span class="d">${full(views)}</span>`],
-    ['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`],
-    ['Comments', fmt(comments), `<span class="d">${posts.some(p=>p.comments!=null) ? full(posts.filter(p=>p.comments!=null).length)+' posts with data' : (CLIENT ? 'where the platform reports it' : 'Facebook only so far')}</span>`],
-    ['Avg views / post', fmt(posts.length ? views/posts.length : null), `<span class="d">median ${fmt(median(posts.map(p=>p.views||0)))}</span>`],
+    ['Followers', fmt(now), anySeries ? deltaHtml(fDelta, haveThen ? pct(now, then) : null) : '<span class="d">no snapshots yet</span>', 'accounts'],
+    ['Posts', full(posts.length), `<span class="d">${(posts.length/Math.max(1,(new Date(end)-new Date(start))/864e5/7)).toFixed(1)+' per week'}${!CLIENT && posts.some(p=>p.date_estimated) ? ' · '+full(posts.filter(p=>p.date_estimated).length)+' dated by log entry' : ''}</span>`, 'posts'],
+    ['Views', fmt(views), `<span class="d">${full(views)}</span>`, 'posts'],
+    ['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`, 'likes'],
+    ['Comments', fmt(comments), `<span class="d">${posts.some(p=>p.comments!=null) ? full(posts.filter(p=>p.comments!=null).length)+' posts with data' : (CLIENT ? 'where the platform reports it' : 'Facebook only so far')}</span>`, 'comments'],
+    ['Avg views / post', fmt(posts.length ? views/posts.length : null), CLIENT ? '<span class="d">across all posts in range</span>' : `<span class="d">median ${fmt(median(posts.map(p=>p.views||0)))}</span>`, 'posts'],
   ];
-  $('#kpis').innerHTML = kp.map(([l,v,d]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
+  $('#kpis').innerHTML = kp.map(([l,v,d,k]) => `<div class="kpi click" data-k="${k}" title="Click to see the posts behind this"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
+  $('#kpis').querySelectorAll('.kpi').forEach(el => el.onclick = () => {
+    const k = el.dataset.k;
+    if (k === 'accounts') { document.querySelector('#tAccounts').scrollIntoView({behavior:'smooth', block:'start'}); return; }
+    const sortKey = k === 'likes' ? 'likes' : k === 'comments' ? 'comments' : 'views';
+    openDrill(`${el.querySelector('.l').textContent} · ${nice(start)} to ${nice(end)}`, posts, sortKey);
+  });
 
   renderFollowers(sel, series); renderNet(sel, series); renderViewsWeek(posts, start, end); renderDonut(posts); renderVolume(posts, start, end); renderShows(posts);
   renderAccounts(sel, series); if (!CLIENT) renderEditors(posts); renderTop(posts); renderAudience();
@@ -326,28 +346,33 @@ function renderViewsWeek(posts, start, end){
   const data = Object.fromEntries(plats.map(p=>[p, ws.map(()=>0)]));
   posts.forEach(p => { if (!p.date) return; const i = idx.get(weekStart(p.date)); if (i!=null && data[p.platform]) data[p.platform][i] += p.views||0; });
   line('cViewsWeek', {type:'bar', data:{labels: ws.map(monthLabel), datasets: plats.map(p=>({label:p, data:data[p], backgroundColor:PCOLORS[p], borderRadius:2, stack:'v'}))},
-    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{stacked:true, ticks:{callback:fmt}}}}});
+    options:clickable({responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{stacked:true, ticks:{callback:fmt}}}},
+      (el, chart) => { const w = ws[el.index]; const p = plats[el.datasetIndex]; openDrill(`Week of ${nice(w)} · ${p}`, posts.filter(x => inWeek(x, w) && x.platform === p)); })});
 }
 function renderDonut(posts){
   const m = {}; posts.forEach(p => m[p.platform] = (m[p.platform]||0) + (p.views||0));
   const plats = PORDER.filter(p=>m[p]);
   line('cDonut', {type:'doughnut', data:{labels:plats, datasets:[{data:plats.map(p=>m[p]), backgroundColor:plats.map(p=>PCOLORS[p]), borderWidth:0, hoverOffset:6}]},
-    options:{responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend, tooltip:{callbacks:{label: c => { const t = c.dataset.data.reduce((a,b)=>a+b,0); return ` ${c.label}: ${full(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`; }}}}}});
+    options:clickable({responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{legend, tooltip:{callbacks:{label: c => { const t = c.dataset.data.reduce((a,b)=>a+b,0); return ` ${c.label}: ${full(c.parsed)} (${(c.parsed/t*100).toFixed(1)}%)`; }}}}},
+      (el) => { const p = plats[el.index]; openDrill(`${p} posts`, posts.filter(x => x.platform === p)); })});
 }
 function renderVolume(posts, start, end){
   const ws = weeks(start, end), idx = new Map(ws.map((w,i)=>[w,i])); const n = ws.map(()=>0), v = ws.map(()=>0);
   posts.forEach(p => { if (!p.date) return; const i = idx.get(weekStart(p.date)); if (i!=null){ n[i]++; v[i]+=p.views||0; } });
   const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
   line('cVolume', {type:'bar', data:{labels: ws.map(monthLabel), datasets:[{type:'bar', label:'Posts', data:n, backgroundColor:accent+'99', borderRadius:2, yAxisID:'y'}, {type:'line', label:'Avg views / post', data:n.map((c,i)=>c?Math.round(v[i]/c):null), borderColor:'#f59e0b', backgroundColor:'#f59e0b', tension:.3, pointRadius:2, borderWidth:2, yAxisID:'y2'}]},
-    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{position:'left', ticks:{precision:0}}, y2:{position:'right', grid:{display:false}, ticks:{callback:fmt}}}}});
+    options:clickable({responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{position:'left', ticks:{precision:0}}, y2:{position:'right', grid:{display:false}, ticks:{callback:fmt}}}},
+      (el) => { const w = ws[el.index]; openDrill(`Week of ${nice(w)}`, posts.filter(x => inWeek(x, w))); })});
 }
 function renderShows(posts){
-  const m = {}; posts.forEach(p => { const k = CLIENT ? (p.channel ? (byId[p.channel]?.name + ' · ' + p.platform) : p.platform)
-    : (p.show || (p.channel && byId[p.channel]?.shows?.[0] && byId[byId[p.channel].shows[0]]?.name) || 'Unassigned'); m[k] = (m[k]||0) + (p.views||0); });
+  const keyOf = p => CLIENT ? (p.channel ? (byId[p.channel]?.name + ' · ' + p.platform) : p.platform)
+    : (p.show || (p.channel && byId[p.channel]?.shows?.[0] && byId[byId[p.channel].shows[0]]?.name) || 'Unassigned');
+  const m = {}; posts.forEach(p => { const k = keyOf(p); m[k] = (m[k]||0) + (p.views||0); });
   const rows = Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
   line('cShows', {type:'bar', data:{labels: rows.map(r=>r[0]), datasets:[{data: rows.map(r=>r[1]), backgroundColor:accent, borderRadius:4, barThickness:14}]},
-    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${full(c.parsed.x)} views`}}}, scales:{x:{ticks:{callback:fmt}}, y:{grid:{display:false}}}}});
+    options:clickable({indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${full(c.parsed.x)} views`}}}, scales:{x:{ticks:{callback:fmt}}, y:{grid:{display:false}}}},
+      (el) => { const k = rows[el.index][0]; openDrill(k, posts.filter(p => keyOf(p) === k)); })});
 }
 
 // ── audience ───────────────────────────────────────────────────────────
@@ -376,14 +401,34 @@ function renderAudience(){
   table('tCity', [{h:'City', k:'city'}, {h:'Followers', k:'followers', n:true}, {h:'Share', k:'share', n:true, f: r => r.share.toFixed(1)+'%'}], cityRows, {k:'followers', d:'desc'});
 }
 
+// ── drill-down ─────────────────────────────────────────────────────────
+function openDrill(title, list, sortKey){
+  const rows = list.map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
+  const v = rows.reduce((a,r)=>a+(r.views||0),0);
+  $('#drawerTitle').textContent = title;
+  $('#drawerSub').textContent = `${full(rows.length)} posts · ${full(v)} views · click a column to sort`;
+  const cols = [{h:'Post', k:'title', t:true, f: r => r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.title)}">${esc(r.title)}</a>` : esc(r.title)}, {h:'Account', k:'account'}, {h:'Platform', k:'platform', f: r => pill(r.platform)}];
+  if (!CLIENT) cols.push({h:'Editor', k:'editor'});
+  cols.push({h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Likes', k:'likes', n:true}, {h:'Comments', k:'comments', n:true});
+  state.sort.tDrill = {k: sortKey || 'views', d:'desc'};
+  table('tDrill', cols, rows, {k: sortKey || 'views', d:'desc'});
+  $('#drawer').hidden = false;
+}
+$('#drawerClose').onclick = () => { $('#drawer').hidden = true; };
+$('#drawer').addEventListener('click', e => { if (e.target === $('#drawer')) $('#drawer').hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#drawer').hidden = true; });
+const clickable = (opts, handler) => Object.assign(opts, {onClick: (evt, els, chart) => { if (els.length) handler(els[0], chart); }, onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; }});
+const inWeek = (p, w) => p.date && weekStart(p.date) === w;
+
 // ── tables ─────────────────────────────────────────────────────────────
-function table(id, cols, rows, defaultSort){
+function table(id, cols, rows, defaultSort, onRow){
   const key = id; const s = state.sort[key] || defaultSort;
   const sorted = [...rows].sort((a,b) => { const x=a[s.k], y=b[s.k]; if (x==null && y==null) return 0; if (x==null) return 1; if (y==null) return -1; return typeof x==='number' ? (s.d==='desc'?y-x:x-y) : (s.d==='desc'?String(y).localeCompare(String(x)):String(x).localeCompare(String(y))); });
   const el = $('#'+id);
   el.innerHTML = '<thead><tr>' + cols.map(c=>`<th class="${c.n?'n':''} ${s.k===c.k?'sorted':''}" data-k="${c.k}">${c.h}</th>`).join('') + '</tr></thead><tbody>' +
-    (sorted.length ? sorted.map(r => '<tr>' + cols.map(c=>`<td class="${c.n?'n':''} ${c.t?'t':''}">${c.f ? c.f(r) : (c.n ? full(r[c.k]) : esc(r[c.k]))}</td>`).join('') + '</tr>').join('') : `<tr><td colspan="${cols.length}" class="empty">Nothing in this selection</td></tr>`) + '</tbody>';
-  el.querySelector('thead').onclick = e => { const th = e.target.closest('th'); if (!th) return; const k = th.dataset.k; const cur = state.sort[key] || defaultSort; state.sort[key] = {k, d: cur.k===k && cur.d==='desc' ? 'asc' : 'desc'}; table(id, cols, rows, defaultSort); };
+    (sorted.length ? sorted.map((r, i) => `<tr class="${onRow?'click':''}" data-i="${i}">` + cols.map(c=>`<td class="${c.n?'n':''} ${c.t?'t':''}">${c.f ? c.f(r) : (c.n ? full(r[c.k]) : esc(r[c.k]))}</td>`).join('') + '</tr>').join('') : `<tr><td colspan="${cols.length}" class="empty">Nothing in this selection</td></tr>`) + '</tbody>';
+  el.querySelector('thead').onclick = e => { const th = e.target.closest('th'); if (!th) return; const k = th.dataset.k; const cur = state.sort[key] || defaultSort; state.sort[key] = {k, d: cur.k===k && cur.d==='desc' ? 'asc' : 'desc'}; table(id, cols, rows, defaultSort, onRow); };
+  if (onRow) el.querySelector('tbody').onclick = e => { if (e.target.closest('a')) return; const tr = e.target.closest('tr'); if (tr && tr.dataset.i != null) onRow(sorted[+tr.dataset.i]); };
 }
 const pill = p => `<span class="pill" style="--c:${PCOLORS[p]||'#999'}">${esc(p)}</span>`;
 function renderAccounts({start,end,posts}, series){
@@ -393,13 +438,13 @@ function renderAccounts({start,end,posts}, series){
     const now = arr.length ? valueAt(arr, end) : (c.followers[p] ?? null);
     const d7 = arr.length>1 ? valueAt(arr, addDays(end,-7)) : null, d30 = arr.length>1 ? valueAt(arr, addDays(end,-30)) : null;
     const t = arr.length>1 ? (valueAt(arr, addDays(start,-1)) ?? firstOnOrAfter(arr, start)) : null;
-    rows.push({account:c.name, photo:c.photo, platform:p, now, c7: d7!=null&&now!=null ? now-d7 : null, c30: d30!=null&&now!=null ? now-d30 : null, cr: t!=null&&now!=null ? now-t : null, pr: t ? pct(now,t) : null, posts: pv[k]?.n||0, views: pv[k]?.v||0, url: c.profiles[p]}); });
+    rows.push({account:c.name, channel:ch, photo:c.photo, platform:p, now, c7: d7!=null&&now!=null ? now-d7 : null, c30: d30!=null&&now!=null ? now-d30 : null, cr: t!=null&&now!=null ? now-t : null, pr: t ? pct(now,t) : null, posts: pv[k]?.n||0, views: pv[k]?.v||0, url: c.profiles[p]}); });
   table('tAccounts', [
     {h:'Account', k:'account', f: r => `<img class="avatar" src="${esc(r.photo||'')}" onerror="this.style.visibility='hidden'">${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.account)}</a>`:esc(r.account)}`},
     {h:'Platform', k:'platform', f: r => pill(r.platform)},
     {h:'Followers', k:'now', n:true}, {h:'7d', k:'c7', n:true, f: r => deltaHtml(r.c7)}, {h:'30d', k:'c30', n:true, f: r => deltaHtml(r.c30)},
     {h:'In range', k:'cr', n:true, f: r => deltaHtml(r.cr, r.pr)}, {h:'Posts', k:'posts', n:true}, {h:'Views', k:'views', n:true},
-  ], rows, {k:'now', d:'desc'});
+  ], rows, {k:'now', d:'desc'}, r => openDrill(`${r.account} · ${r.platform}`, posts.filter(p => p.channel === r.channel && p.platform === r.platform)));
 }
 function renderEditors(posts){
   const m = {}; posts.forEach(p => { const e = p.editor || 'Unassigned'; const r = m[e] = m[e] || {editor:e, posts:0, views:0, likes:0, top:0, topTitle:'', vs:[]}; r.posts++; r.views += p.views||0; r.likes += p.likes||0; r.vs.push(p.views||0); if ((p.views||0) > r.top) { r.top = p.views||0; r.topTitle = p.title || p.hook; } });
