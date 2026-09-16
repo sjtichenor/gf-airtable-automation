@@ -121,9 +121,18 @@ def refresh(account):
 
 
 def tt_post(account, path, params, body):
-    r = requests.post(f"{TT}{path}", params=params, json=body,
-                      headers={"Authorization": f"Bearer {account['tokens']['access_token']}", "Content-Type": "application/json"},
-                      timeout=30)
+    """POST endpoints (video/query, video/list). user/info is a GET."""
+    return _tt(account, "POST", path, params, body)
+
+
+def tt_get(account, path, params):
+    return _tt(account, "GET", path, params, None)
+
+
+def _tt(account, method, path, params, body):
+    r = requests.request(method, f"{TT}{path}", params=params, json=body,
+                         headers={"Authorization": f"Bearer {account['tokens']['access_token']}", "Content-Type": "application/json"},
+                         timeout=30)
     try:
         j = r.json()
     except ValueError:
@@ -222,7 +231,7 @@ def sync_followers(accounts):
             by_handle[path[0].lower().lstrip("@")] = c
     print("\nFollowers:")
     for a in accounts:
-        data = tt_post(a, "/v2/user/info/", {"fields": "open_id,username,follower_count,likes_count,video_count"}, {})
+        data = tt_get(a, "/v2/user/info/", {"fields": "open_id,username,follower_count,likes_count,video_count"})
         info = (data or {}).get("user") or {}
         if info.get("follower_count") is None:
             print(f"   @{a['username']}: no follower count returned")
