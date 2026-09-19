@@ -38,7 +38,6 @@ TABLES = {
     "clients": "tblYF8v9O280SU2oB",
     "status_logs": "tblnPcYMXNYwLkpYD",
     "demographics": "tblG4ElwziblQZM9E",
-    "insights": "tbl5tBiqrbwN3WgzT",
 }
 ACTIVITY_DAYS = int(os.environ.get("DASHBOARD_ACTIVITY_DAYS", "120"))
 
@@ -125,13 +124,6 @@ DM = {
     "segment": "fldwi2ZU45kYJMgjG",   # Segment
     "followers": "fld4AtOLwZ6YZTrye", # Followers
     "week": "fldk2CxcRNWbFqMnX",      # Week
-}
-AI = {
-    "channel": "fldgvb24rPt9aUEi4",   # Social Media Account
-    "platform": "fldsCuX3MaB0AuLnD",  # Platform
-    "date": "fldP30u9uaX02e8nx",      # Date
-    "reach": "fldjH8c2JnNa0EiUa",     # Reach
-    "views": "fld9FABYY6fvbxw25",     # Views
 }
 TE = {
     "name": "fldbUkybFQu3SyAFI",      # Name (formula)
@@ -244,7 +236,6 @@ def build_snapshot() -> dict:
         "followers": (TABLES["followers"], _flatten(FL.values()), None),
         "status_logs": (TABLES["status_logs"], _flatten(SL.values()), formula),
         "demographics": (TABLES["demographics"], _flatten(DM.values()), None),
-        "insights": (TABLES["insights"], _flatten(AI.values()), None),
     }
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = {name: pool.submit(fetch_table, *args) for name, args in jobs.items()}
@@ -380,16 +371,6 @@ def build_snapshot() -> dict:
             "prev": f.get(FL["prev"]),
         })
 
-    # Account-level daily reach and views (Instagram so far), one row per day.
-    insights = []
-    for r in raw["insights"]:
-        f = r["fields"]
-        ch = _first(f.get(AI["channel"]))
-        if not ch or ch not in channels or not f.get(AI["date"]):
-            continue
-        insights.append({"channel": ch, "platform": norm_platform(f.get(AI["platform"])), "date": f.get(AI["date"]),
-                         "reach": f.get(AI["reach"]), "views": f.get(AI["views"])})
-
     # Status history: only the recent window plus anything still open. The
     # table is 25k+ rows and growing; filterByFormula needs field names.
     status_logs = []
@@ -442,7 +423,6 @@ def build_snapshot() -> dict:
         "status_logs": status_logs,
         "posts": posts,
         "followers": followers,
-        "insights": insights,
     }
 
 
@@ -545,17 +525,8 @@ def fake_snapshot() -> dict:
             demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "Country", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
         for seg, share in [("New York, New York", .08), ("Los Angeles, California", .06), ("London, England", .05), ("San Francisco, California", .04), ("Toronto, Ontario", .03), ("Chicago, Illinois", .02)]:
             demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "City", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
-    insights = []
-    for ch in channels:
-        if "Instagram" not in ch["followers"]:
-            continue
-        base = ch["followers"]["Instagram"] / 40
-        for d in range(365, 0, -1):
-            reach = int(base * rnd.lognormvariate(0, 0.9))
-            insights.append({"channel": ch["id"], "platform": "Instagram", "date": (today - timedelta(days=d)).isoformat(),
-                             "reach": reach, "views": int(reach * rnd.uniform(1.1, 1.5))})
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-            "shows": shows, "channels": channels, "demographics": demographics, "insights": insights, "team": team_rows, "videos": videos, "status_logs": status_logs,
+            "shows": shows, "channels": channels, "demographics": demographics, "team": team_rows, "videos": videos, "status_logs": status_logs,
             "posts": posts, "followers": followers}
 
 
@@ -679,7 +650,6 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
         name, logo, primary = show["name"], show.get("logo"), [show]
     followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
-    insights = [i for i in snap.get("insights", []) if i["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
     vkeep = ("id", "title", "show", "type", "created", "status", "finished")
     videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if v.get("show") in show_names]
@@ -691,6 +661,5 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
         "demographics": demographics,
         "posts": posts,
         "followers": followers,
-        "insights": insights,
         "videos": videos,
     }

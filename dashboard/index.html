@@ -126,8 +126,6 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
     <div class="card span8"><h3>Views by week posted</h3><div class="sub">Lifetime views of clips, grouped by the week they went out · click a bar for the posts</div><div class="chart"><canvas id="cViewsWeek"></canvas></div></div>
     <div class="card span4"><h3>Views by platform</h3><div class="sub">Share of views in the selected range</div><div class="chart"><canvas id="cDonut"></canvas></div></div>
 
-    <div class="card span12" id="reachCard"><h3>Accounts reached</h3><div class="sub" id="reachSub"></div><div class="chart"><canvas id="cReach"></canvas></div></div>
-
     <div class="card span6"><h3>Posting volume</h3><div class="sub" id="volumeSub">Posts per week, with average views per post</div><div class="chart"><canvas id="cVolume"></canvas></div></div>
     <div class="card span6"><h3 id="showsTitle">Views by show</h3><div class="sub" id="showsSub">Top shows in the selected range</div><div class="chart"><canvas id="cShows"></canvas></div></div>
 
@@ -272,8 +270,7 @@ function select(){
     if (state.channel) { const c = byId[state.channel]; if (!c || !c.shows.some(sid => byId[sid]?.name === v.show)) return false; }
     const d = v.created ? String(v.created).slice(0,10) : null; return d && d >= start && d <= end;
   });
-  const insights = (DATA.insights||[]).filter(i => state.platforms.has(i.platform) && channelOk(byId[i.channel]) && i.date >= start && i.date <= end);
-  return {start, end, posts, followers, videos, insights};
+  return {start, end, posts, followers, videos};
 }
 
 // series: key -> sorted [{date,count}]
@@ -284,7 +281,7 @@ const firstOnOrAfter = (arr, day) => { for (const r of arr) if (r.date >= day) r
 // ── render ─────────────────────────────────────────────────────────────
 function render(){
   writeUrl();
-  const sel = select(); const {start, end, posts, followers, videos, insights} = sel;
+  const sel = select(); const {start, end, posts, followers, videos} = sel;
   const css = getComputedStyle(document.documentElement);
   Chart.defaults.color = css.getPropertyValue('--muted').trim(); Chart.defaults.borderColor = css.getPropertyValue('--grid').trim();
   Chart.defaults.font.family = 'Inter, sans-serif'; Chart.defaults.font.size = 11;
@@ -301,7 +298,6 @@ function render(){
   const views = sum('views'), likes = sum('likes'), comments = sum('comments');
   const dated = posts.filter(p=>p.date);
   CUR = {posts, start, end};
-  const reach = sum('reach'), withReach = posts.filter(p=>p.reach!=null).length;
   const weeksIn = Math.max(1,(new Date(end)-new Date(start))/864e5/7);
   const kp = [
     ['Followers', fmt(now), anySeries ? deltaHtml(fDelta, haveThen ? pct(now, then) : null) : '<span class="d">no snapshots yet</span>', 'accounts'],
@@ -309,7 +305,6 @@ function render(){
     ['Videos', full(videos.length), `<span class="d">${(videos.length/weeksIn).toFixed(1)} per week · created in range</span>`, 'videos'],
     ['Views', fmt(views), `<span class="d">${full(views)}</span>`, 'posts'],
   ];
-  if (withReach) kp.push(['Reach', fmt(reach), `<span class="d">across ${full(withReach)} Instagram post${withReach===1?'':'s'}</span>`, 'reach']);
   kp.push(['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`, 'likes']);
   if (!CLIENT) kp.push(['Avg views / post', fmt(posts.length ? views/posts.length : null), `<span class="d">median ${fmt(median(posts.map(p=>p.views||0)))}</span>`, 'posts']);
   $('#kpis').innerHTML = kp.map(([l,v,d,k]) => `<div class="kpi ${k==='videos'?'':'click'}" data-k="${k}" title="${k==='videos'?'Videos created in the selected range':'Click to see the posts behind this'}"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
@@ -317,11 +312,11 @@ function render(){
     const k = el.dataset.k;
     if (k === 'videos') return;
     if (k === 'accounts') { document.querySelector('#tAccounts').scrollIntoView({behavior:'smooth', block:'start'}); return; }
-    const sortKey = k === 'likes' ? 'likes' : k === 'reach' ? 'reach' : 'views';
+    const sortKey = k === 'likes' ? 'likes' : 'views';
     openDrill(`${el.querySelector('.l').textContent} · ${nice(start)} to ${nice(end)}`, posts, sortKey);
   });
 
-  renderFollowers(sel, series); renderNet(sel, series); renderViewsWeek(posts, start, end); renderReach(insights, start, end); renderDonut(posts); renderVolume(posts, start, end); renderShows(posts);
+  renderFollowers(sel, series); renderNet(sel, series); renderViewsWeek(posts, start, end); renderDonut(posts); renderVolume(posts, start, end); renderShows(posts);
   renderAccounts(sel, series); if (!CLIENT) renderEditors(posts); renderTop(posts); renderAudience();
   $('#stamp').textContent = 'Data as of ' + new Date(DATA.generated_at).toLocaleString() + (DATA.build_seconds ? ` · pulled in ${DATA.build_seconds}s` : '');
   $('#foot').textContent = (CLIENT ? `${MODE.name} · ` : '') + `${full(DATA.posts.length)} posts, ${full(DATA.followers.length)} follower snapshots and ${DATA.channels.length} accounts loaded. Follower history starts ${DATA.followers.length ? DATA.followers.map(f=>f.date).reduce((a,b)=>a<b?a:b) : '—'}; views are lifetime totals per post as last synced.` + (CLIENT ? ' Prepared by Good Future Media.' : '');
@@ -364,19 +359,6 @@ function renderViewsWeek(posts, start, end){
   line('cViewsWeek', {type:'bar', data:{labels: ws.map(monthLabel), datasets: plats.map(p=>({label:p, data:data[p], backgroundColor:PCOLORS[p], borderRadius:2, stack:'v'}))},
     options:clickable({responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{stacked:true, ticks:{callback:fmt}}}},
       (el, chart) => { const w = ws[el.index]; const p = plats[el.datasetIndex]; openDrill(`Week of ${nice(w)} · ${p}`, posts.filter(x => inWeek(x, w) && x.platform === p)); })});
-}
-function renderReach(insights, start, end){
-  const card = $('#reachCard');
-  if (!insights.length) { card.style.display='none'; return; }
-  card.style.display='';
-  const ws = weeks(start, end), idx = new Map(ws.map((w,i)=>[w,i])); const r = ws.map(()=>0), v = ws.map(()=>0); const days = new Set();
-  insights.forEach(i => { const k = idx.get(weekStart(i.date)); if (k==null) return; r[k] += i.reach||0; v[k] += i.views||0; days.add(i.date); });
-  const accs = [...new Set(insights.map(i=>i.channel))];
-  const total = r.reduce((a,b)=>a+b,0);
-  const who = accs.length===1 ? (byId[accs[0]]?.name || 'the account') : accs.length+' accounts';
-  $('#reachSub').textContent = `People reached each day by ${who} on Instagram, added up by week · ${full(total)} over ${full(days.size)} days in range · from Meta Insights`;
-  line('cReach', {type:'bar', data:{labels: ws.map(monthLabel), datasets:[{type:'bar', label:'Accounts reached', data:r, backgroundColor:PCOLORS['Instagram'], borderRadius:2, yAxisID:'y'}, {type:'line', label:'Views', data:v, borderColor:'#f59e0b', backgroundColor:'#f59e0b', tension:.3, pointRadius:2, borderWidth:2, yAxisID:'y'}]},
-    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{ticks:{callback:fmt}}}}});
 }
 function renderDonut(posts){
   const m = {}; posts.forEach(p => m[p.platform] = (m[p.platform]||0) + (p.views||0));
@@ -436,13 +418,13 @@ function renderAudience(){
 
 // ── drill-down ─────────────────────────────────────────────────────────
 function openDrill(title, list, sortKey){
-  const rows = list.map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, reach:p.reach, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
+  const rows = list.map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
   const v = rows.reduce((a,r)=>a+(r.views||0),0);
   $('#drawerTitle').textContent = title;
   $('#drawerSub').textContent = `${full(rows.length)} posts · ${full(v)} views · click a column to sort`;
   const cols = [{h:'Post', k:'title', t:true, f: r => r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.title)}">${esc(r.title)}</a>` : esc(r.title)}, {h:'Account', k:'account'}, {h:'Platform', k:'platform', f: r => pill(r.platform)}];
   if (!CLIENT) cols.push({h:'Editor', k:'editor'});
-  cols.push({h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Reach', k:'reach', n:true, f: r => r.reach==null ? '—' : full(r.reach)}, {h:'Likes', k:'likes', n:true});
+  cols.push({h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Likes', k:'likes', n:true});
   if (!CLIENT) cols.push({h:'Comments', k:'comments', n:true});
   state.sort.tDrill = {k: sortKey || 'views', d:'desc'};
   table('tDrill', cols, rows, {k: sortKey || 'views', d:'desc'});
@@ -486,10 +468,10 @@ function renderEditors(posts){
   table('tEditors', [{h:'Editor', k:'editor'}, {h:'Posts', k:'posts', n:true}, {h:'Views', k:'views', n:true}, {h:'Avg', k:'avg', n:true}, {h:'Median', k:'med', n:true}, {h:'Best post', k:'top', n:true, f: r => `<span title="${esc(r.topTitle)}">${full(r.top)}</span>`}], rows, {k:'views', d:'desc'});
 }
 function renderTop(posts){
-  const rows = [...posts].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,40).map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, reach:p.reach, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
+  const rows = [...posts].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,40).map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
   const cols = [{h:'Post', k:'title', t:true, f: r => r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.title)}">${esc(r.title)}</a>` : esc(r.title)}, {h:'Account', k:'account'}, {h:'Platform', k:'platform', f: r => pill(r.platform)}];
   if (!CLIENT) cols.push({h:'Editor', k:'editor'});
-  cols.push({h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Reach', k:'reach', n:true, f: r => r.reach==null ? '—' : full(r.reach)}, {h:'Likes', k:'likes', n:true});
+  cols.push({h:'Date', k:'date'}, {h:'Views', k:'views', n:true}, {h:'Likes', k:'likes', n:true});
   if (!CLIENT) cols.push({h:'Comments', k:'comments', n:true});
   table('tTop', cols, rows, {k:'views', d:'desc'});
 }
