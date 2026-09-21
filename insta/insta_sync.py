@@ -907,63 +907,77 @@ class InstagramDynamicSync:
         
         return len(self.username_to_page_data) > 0
 
-    # The Page walk above only finds Instagram accounts that have a Facebook
-    # Page linked to them. Eleven of ours have none, so nothing ever refreshed
-    # their follower counts and the Channels table kept serving whatever it
-    # last held. The business knows about those accounts anyway, but only a
-    # system-user token is allowed to ask it, which is what
-    # META_SYSTEM_USER_TOKEN is for. Accounts the Page walk already found are
-    # left alone -- this only fills the gaps.
+    # The Page walk above finds Instagram accounts through /me/accounts, which
+    # returns only the Pages the token itself administers -- 8 of the 10 this
+    # business owns. The business's own owned_pages edge returns all 10, and
+    # an Instagram account hangs off its Page whether or not /me/accounts
+    # lists that Page, so ask the business for the Pages and read the
+    # Instagram account off each one.
+    #
+    # Not owned_instagram_accounts: Meta refuses that edge outright (HTTP 400,
+    # "does not support this operation") while owned_pages on the same
+    # business id succeeds, so the Instagram edges are simply not available to
+    # us. Accounts with no Page at all stay out of reach either way -- the
+    # Graph API has no route to those without linking them to a Page first.
     def add_business_instagram_accounts(self):
         sys_tok = os.getenv('META_SYSTEM_USER_TOKEN')
         biz = os.getenv('META_BUSINESS_ID')
         if not (sys_tok and biz):
             return 0
 
-        print("\nAsking the business for Instagram accounts the Page walk missed...")
-        added = 0
-        for edge in ('owned_instagram_accounts', 'client_instagram_accounts'):
-            try:
-                response = requests.get(
-                    f"{self.meta_base_url}/{biz}/{edge}",
-                    params={'fields': 'id,username,followers_count',
-                            'access_token': sys_tok, 'limit': 100},
-                    timeout=30)
-            except Exception as e:
-                print(f"   {edge}: {e}")
+        print("\nAsking the business for Pages the token does not administer...")
+        try:
+            response = requests.get(
+                f"{self.meta_base_url}/{biz}/owned_pages",
+                params={'fields': 'name,access_token,'
+                                  'instagram_business_account{id,username,followers_count}',
+                        'access_token': sys_tok, 'limit': 100},
+                timeout=30)
+        except Exception as e:
+            print(f"   owned_pages: {e}")
+            return 0
+
+        if response.status_code != 200:
+            print(f"   owned_pages: HTTP {response.status_code} {response.text[:200]}")
+            return 0
+
+        pages = response.json().get('data', [])
+        print(f"   owned_pages: {len(pages)} page(s)")
+
+        added, no_ig, already = 0, [], 0
+        for page in pages:
+            ig = page.get('instagram_business_account') or {}
+            username = ig.get('username')
+            if not username:
+                no_ig.append(page.get('name') or page.get('id'))
+                continue
+            if username in self.username_to_page_data:
+                already += 1
                 continue
 
-            if response.status_code != 200:
-                print(f"   {edge}: HTTP {response.status_code} {response.text[:200]}")
+            followers = ig.get('followers_count')
+            if followers is None:
+                info = self.get_instagram_username(ig['id'], page.get('access_token') or sys_tok)
+                followers = (info or {}).get('followers_count')
+            if followers is None:
+                print(f"      @{username}: no follower count returned, skipping")
                 continue
 
-            accounts = response.json().get('data', [])
-            print(f"   {edge}: {len(accounts)} account(s)")
+            self.username_to_page_data[username] = {
+                'page_id': page.get('id'),
+                'page_name': page.get('name'),
+                # The Page's own token when the business hands one over, since
+                # that is what the rest of the sync expects; the system user's
+                # otherwise.
+                'page_access_token': page.get('access_token') or sys_tok,
+                'ig_account_id': ig['id'],
+                'followers_count': followers
+            }
+            added += 1
+            print(f"      @{username}: {followers:,} followers, via {page.get('name')}")
 
-            for ig in accounts:
-                username = ig.get('username')
-                if not username or username in self.username_to_page_data:
-                    continue
-
-                followers = ig.get('followers_count')
-                if followers is None:
-                    # Some edges return the node without the count; ask for it.
-                    info = self.get_instagram_username(ig['id'], sys_tok)
-                    followers = (info or {}).get('followers_count')
-                if followers is None:
-                    print(f"      @{username}: no follower count returned, skipping")
-                    continue
-
-                self.username_to_page_data[username] = {
-                    'page_id': None,
-                    'page_name': edge,
-                    'page_access_token': sys_tok,
-                    'ig_account_id': ig['id'],
-                    'followers_count': followers
-                }
-                added += 1
-                print(f"      @{username}: {followers:,} followers")
-
+        print(f"   {already} already known, {len(no_ig)} page(s) with no Instagram account"
+              + (f" ({', '.join(no_ig)})" if no_ig else ""))
         print(f"   {added} account(s) added that the Page walk could not see")
         return added
 
