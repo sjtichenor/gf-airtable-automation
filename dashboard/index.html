@@ -449,17 +449,21 @@ function renderAudience(){
 // drawer rather than being squeezed into the post columns.
 function openVideoDrill(title, list){
   const rows = list.map(v => ({title: v.title || '(untitled)', show: v.show || '', type: v.type || '',
-    status: v.status || '', editor: v.editor || '',
+    status: v.status || '', editor: v.editor || '', views: v.views, posts: v.posts,
     created: (v.created || '').slice(0,10), finished: (v.finished || '').slice(0,10)}));
+  // A video's views are the total across every post it became, whenever those
+  // went out, so this figure is not the same as the Views tile for the range.
+  const tv = rows.reduce((a,r)=>a+(r.views||0),0);
   $('#drawerTitle').textContent = title;
-  $('#drawerSub').textContent = `${full(rows.length)} video${rows.length===1?'':'s'} created in this range · click a column to sort`;
+  $('#drawerSub').textContent = `${full(rows.length)} video${rows.length===1?'':'s'} created in this range · `
+    + `${full(tv)} views across every post they became · click a column to sort`;
   const cols = [{h:'Video', k:'title', t:true, f: r => `<span title="${esc(r.title)}">${esc(r.title)}</span>`},
                 {h:'Show', k:'show'}, {h:'Type', k:'type'}];
   if (!CLIENT) cols.push({h:'Status', k:'status'}, {h:'Editor', k:'editor'});
-  cols.push({h:'Created', k:'created'});
+  cols.push({h:'Posts', k:'posts', n:true}, {h:'Views', k:'views', n:true}, {h:'Created', k:'created'});
   if (!CLIENT) cols.push({h:'Finished', k:'finished'});
-  state.sort.tDrill = {k:'created', d:'desc'};
-  table('tDrill', cols, rows, {k:'created', d:'desc'});
+  state.sort.tDrill = {k:'views', d:'desc'};
+  table('tDrill', cols, rows, {k:'views', d:'desc'});
   $('#drawer').hidden = false;
 }
 function openDrill(title, list, sortKey){

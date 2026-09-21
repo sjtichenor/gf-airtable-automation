@@ -103,6 +103,8 @@ VI = {
     "tier": "fldSdpynhbuP9xGQB",      # Editing Tier Level
     "started": "fldgCet8UIFFyReqz",   # Date Started Editing
     "finished": "fldlyyfQG6JQ6Mp7U",  # Date Finished Editing
+    "views": "fldBTytz2Zd8oUOKl",     # Views rollup (SUM across its posts)
+    "post_count": "fld3JS6ACIpCHGlYf",  # how many posts that video became
 }
 SL = {
     "status": "fld0AbS8C4hW6idfb",    # Status
@@ -322,6 +324,8 @@ def build_snapshot() -> dict:
             "started": f.get(VI["started"]),
             "finished": f.get(VI["finished"]),
             "speaker": f.get(VI["speaker"]) or "",
+            "views": f.get(VI["views"]),
+            "posts": f.get(VI["post_count"]),
         }
 
     posts = []
@@ -494,7 +498,8 @@ def fake_snapshot() -> dict:
         videos.append({"id": f"v{n}", "title": f"Clip {n}: something someone said", "show": show_names[n % 6], "editor": ed, "director": di,
                        "miner": rnd.choice(editors), "client": None, "type": "Clip", "tier": "1 - Basic", "status": cur,
                        "status_since": hist[-1][1].isoformat(timespec="seconds") + "Z", "created": t0.isoformat(timespec="seconds") + "Z",
-                       "created_by": rnd.choice(editors), "started": None, "finished": None, "speaker": ""})
+                       "created_by": rnd.choice(editors), "started": None, "finished": None, "speaker": "",
+                       "views": int(rnd.lognormvariate(9, 1.4)), "posts": rnd.randint(1, 5)})
         for st, a, b in hist:
             status_logs.append({"video": f"v{n}", "status": st, "start": a.isoformat(timespec="seconds") + "Z", "end": b.isoformat(timespec="seconds") + "Z" if b else None})
     posts = []
@@ -691,7 +696,7 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
-    vkeep = ("id", "title", "show", "type", "created")  # no pipeline state leaves the server
+    vkeep = ("id", "title", "show", "type", "created", "views", "posts")  # no pipeline state leaves the server
     pick = (lambda v: hit(v.get("title"))) if match else (lambda v: v.get("show") in show_names)
     videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if pick(v)]
     if match:
