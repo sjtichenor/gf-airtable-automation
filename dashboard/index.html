@@ -28,7 +28,10 @@ header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85
 .brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
 .spacer{flex:1}
 .byline{font-size:12px;color:var(--muted)}
-.brand img.logo{width:28px;height:28px;border-radius:8px;object-fit:cover}
+/* Client logos range from square avatars to wide wordmarks (Flock's is
+   738x213). Fix the height and let width follow, so a wordmark reads as
+   one instead of being centre-cropped into a square. */
+.brand img.logo{height:28px;width:auto;max-width:140px;border-radius:8px;object-fit:contain}
 body.client #topCard{grid-column:span 12}
 body.client .nav,body.client #fShow,body.client #fEditor,body.client #refresh,body.client #ownedWrap,body.client #editorsCard{display:none}
 .nav{display:flex;gap:4px;margin-left:8px}.nav a{padding:6px 10px;border-radius:8px;color:var(--muted);font-weight:500}.nav a.on{background:var(--chip);color:var(--text)}
@@ -155,7 +158,8 @@ if (CLIENT) {
   document.title = `${MODE.name} · Performance report`;
   document.body.classList.add('client');
   const b = document.querySelector('.brand');
-  b.innerHTML = (MODE.logo ? `<img class="logo" src="${MODE.logo}" alt="">` : '<span class="dot"></span>') + `${MODE.name.replace(/[&<>]/g,'')}<span class="sub">Performance report</span>`;
+  const safeName = MODE.name.replace(/[&<>"]/g,'');
+  b.innerHTML = (MODE.logo ? `<img class="logo" src="${MODE.logo}" alt="${safeName}">` : '<span class="dot"></span>') + `${safeName}<span class="sub">Performance report</span>`;
   document.querySelector('.byline').textContent = 'Prepared by Good Future Media';
   document.querySelector('#signout').href = `/clients/${MODE.slug}/logout`;
   document.querySelector('#showsTitle').textContent = 'Views by account';

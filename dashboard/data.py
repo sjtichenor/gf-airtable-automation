@@ -543,7 +543,7 @@ def fake_snapshot() -> dict:
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
             "shows": shows, "channels": channels, "demographics": demographics, "team": team_rows, "videos": videos, "status_logs": status_logs,
             "posts": posts, "followers": followers,
-            "client_logos": {"flock": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='%234ade80'%3EF%3C/text%3E%3C/svg%3E"}}
+            "client_logos": {"flock": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 738 213'%3E%3Crect width='738' height='213' fill='%23111'/%3E%3Ctext x='369' y='140' font-size='120' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%234ade80'%3EFLOCK%3C/text%3E%3C/svg%3E"}}
 
 
 # ── cache + background refresh ───────────────────────────────────────────
