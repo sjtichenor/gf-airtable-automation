@@ -652,6 +652,18 @@ def client_matches() -> Dict[str, dict]:
     return out
 
 
+def no_follower_clients() -> set:
+    """Client slugs whose account followers are not theirs to claim.
+    CLIENT_NO_FOLLOWERS = "solana;other" (slugs, separated by ; or ,).
+
+    Some accounts are posted to by many people, not only us, so the follower
+    count on them is not something the client paid for and not a number they
+    should read as a measure of our work. Those pages get post performance
+    only, the same shape a title-matched client gets."""
+    raw = os.environ.get("CLIENT_NO_FOLLOWERS", "")
+    return {s.strip().lower() for s in raw.replace(",", ";").split(";") if s.strip()}
+
+
 def client_view(snap: dict, slug: str) -> Optional[dict]:
     """The slice of the snapshot one client may see. A client is either a
     show (slug = slugified show name: that show, the channels linked to it,
@@ -707,7 +719,8 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     # Any client may carry a logo on its Clients record; that wins for a
     # title-matched client, which has no show or channel to borrow one from.
     logo = snap.get("client_logos", {}).get((name or "").strip().lower()) or logo
-    followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
+    followers = ([] if (slug or "").strip().lower() in no_follower_clients()
+                 else [f for f in snap.get("followers", []) if f["channel"] in channel_ids])
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
     vkeep = ("id", "title", "show", "type", "created", "views", "posts")  # no pipeline state leaves the server
