@@ -651,7 +651,7 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
-    vkeep = ("id", "title", "show", "type", "created", "status", "finished")
+    vkeep = ("id", "title", "show", "type", "created")  # no pipeline state leaves the server
     videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if v.get("show") in show_names]
     return {
         "generated_at": snap.get("generated_at"),

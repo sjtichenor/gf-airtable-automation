@@ -307,10 +307,12 @@ function render(){
   ];
   kp.push(['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`, 'likes']);
   if (!CLIENT) kp.push(['Avg views / post', fmt(posts.length ? views/posts.length : null), `<span class="d">median ${fmt(median(posts.map(p=>p.views||0)))}</span>`, 'posts']);
-  $('#kpis').innerHTML = kp.map(([l,v,d,k]) => `<div class="kpi ${k==='videos'?'':'click'}" data-k="${k}" title="${k==='videos'?'Videos created in the selected range':'Click to see the posts behind this'}"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
+  const kpiHint = k => k === 'videos' ? 'Click to see the videos created in this range'
+    : k === 'accounts' ? 'Click to jump to the accounts table' : 'Click to see the posts behind this';
+  $('#kpis').innerHTML = kp.map(([l,v,d,k]) => `<div class="kpi click" data-k="${k}" title="${kpiHint(k)}"><div class="l">${l}</div><div class="v">${v}</div><div>${d}</div></div>`).join('');
   $('#kpis').querySelectorAll('.kpi').forEach(el => el.onclick = () => {
     const k = el.dataset.k;
-    if (k === 'videos') return;
+    if (k === 'videos') { openVideoDrill(`Videos · ${nice(start)} to ${nice(end)}`, videos); return; }
     if (k === 'accounts') { document.querySelector('#tAccounts').scrollIntoView({behavior:'smooth', block:'start'}); return; }
     const sortKey = k === 'likes' ? 'likes' : 'views';
     openDrill(`${el.querySelector('.l').textContent} · ${nice(start)} to ${nice(end)}`, posts, sortKey);
@@ -418,6 +420,24 @@ function renderAudience(){
 }
 
 // ── drill-down ─────────────────────────────────────────────────────────
+// Videos are not posts: one video can become several posts or none, and it
+// carries pipeline fields instead of engagement ones, so it gets its own
+// drawer rather than being squeezed into the post columns.
+function openVideoDrill(title, list){
+  const rows = list.map(v => ({title: v.title || '(untitled)', show: v.show || '', type: v.type || '',
+    status: v.status || '', editor: v.editor || '',
+    created: (v.created || '').slice(0,10), finished: (v.finished || '').slice(0,10)}));
+  $('#drawerTitle').textContent = title;
+  $('#drawerSub').textContent = `${full(rows.length)} video${rows.length===1?'':'s'} created in this range · click a column to sort`;
+  const cols = [{h:'Video', k:'title', t:true, f: r => `<span title="${esc(r.title)}">${esc(r.title)}</span>`},
+                {h:'Show', k:'show'}, {h:'Type', k:'type'}];
+  if (!CLIENT) cols.push({h:'Status', k:'status'}, {h:'Editor', k:'editor'});
+  cols.push({h:'Created', k:'created'});
+  if (!CLIENT) cols.push({h:'Finished', k:'finished'});
+  state.sort.tDrill = {k:'created', d:'desc'};
+  table('tDrill', cols, rows, {k:'created', d:'desc'});
+  $('#drawer').hidden = false;
+}
 function openDrill(title, list, sortKey){
   const rows = list.map(p => ({title: p.title || p.hook || '(untitled)', account: p.channel ? byId[p.channel]?.name : '', platform:p.platform, date:p.date||'', views:p.views, likes:p.likes, comments:p.comments, url:p.url, editor:p.editor||''}));
   const v = rows.reduce((a,r)=>a+(r.views||0),0);
