@@ -138,7 +138,8 @@ TE = {
     "start": "fldlq4ZRfCkdkKsF6",     # Start Date
     "bootcamp": "flddA3zwYMTfOhU9z",  # Bootcamp Class
 }
-CL = {"name": "fldGWgYaByXkGtc3Y"}    # Client Account Name
+CL = {"name": "fldGWgYaByXkGtc3Y",    # Client Account Name
+      "logo": "fldnTGv016lmdGlmg"}  # Logo attachment (9 of 34 clients had one, 2026-09-21)
 
 PLATFORM_ALIASES = {"Twitter": "X", "twitter": "X", "x": "X"}
 
@@ -230,7 +231,7 @@ def build_snapshot() -> dict:
     formula = ("OR(IS_AFTER({Start Time}, DATEADD(NOW(), -%d, 'days')), {End Time} = BLANK())" % ACTIVITY_DAYS)
     jobs = {
         "team": (TABLES["team"], _flatten(TE.values()), None),
-        "clients": (TABLES["clients"], [CL["name"]], None),
+        "clients": (TABLES["clients"], _flatten(CL.values()), None),
         "shows": (TABLES["shows"], _flatten(SH.values()), None),
         "channels": (TABLES["channels"], _flatten([CH["name"], CH["owned"], CH["shows"], CH["status"], CH["photo"], CH["profiles"], CH["followers"]]), None),
         "videos": (TABLES["videos"], _flatten(VI.values()), None),
@@ -272,6 +273,14 @@ def build_snapshot() -> dict:
             return None
         return by_user.get(c.get("id")) or by_email.get(c.get("email")) or c.get("name")
     clients = {r["id"]: (r["fields"].get(CL["name"]) or "?") for r in raw["clients"]}
+    # Client logos keyed by name, so any kind of client dashboard can wear its
+    # own mark. Airtable attachment URLs expire, but the snapshot is rebuilt
+    # every 15 minutes, well inside that window.
+    client_logos = {}
+    for r in raw["clients"]:
+        nm, att = r["fields"].get(CL["name"]), r["fields"].get(CL["logo"])
+        if nm and att:
+            client_logos[nm.strip().lower()] = _thumb(att)
 
     shows = {}
     for r in raw["shows"]:
@@ -427,6 +436,7 @@ def build_snapshot() -> dict:
         "status_logs": status_logs,
         "posts": posts,
         "followers": followers,
+        "client_logos": client_logos,
     }
 
 
@@ -532,7 +542,8 @@ def fake_snapshot() -> dict:
             demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "City", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
             "shows": shows, "channels": channels, "demographics": demographics, "team": team_rows, "videos": videos, "status_logs": status_logs,
-            "posts": posts, "followers": followers}
+            "posts": posts, "followers": followers,
+            "client_logos": {"flock": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='%234ade80'%3EF%3C/text%3E%3C/svg%3E"}}
 
 
 # ── cache + background refresh ───────────────────────────────────────────
@@ -693,6 +704,9 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
                 p["channel"] = None
             p["show"] = show["name"]
         name, logo, primary = show["name"], show.get("logo"), [show]
+    # Any client may carry a logo on its Clients record; that wins for a
+    # title-matched client, which has no show or channel to borrow one from.
+    logo = snap.get("client_logos", {}).get((name or "").strip().lower()) or logo
     followers = [f for f in snap.get("followers", []) if f["channel"] in channel_ids]
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
