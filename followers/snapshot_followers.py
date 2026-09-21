@@ -44,6 +44,7 @@ F_DATE = "Date"
 F_COUNT = "Follower Count"
 F_PREVIOUS = "Previous Count"
 F_CHANNEL = "Social Media Account"
+F_NOTES = "Notes"
 
 HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 API = f"https://api.airtable.com/v0/{BASE}"
@@ -81,7 +82,7 @@ def main():
 
     # Latest prior row per (channel, platform) gives Previous Count; today's
     # rows, if any, get updated instead of duplicated.
-    logs = list_all(LOGS, **{"fields[]": [F_PLATFORM, F_DATE, F_COUNT, F_CHANNEL]})
+    logs = list_all(LOGS, **{"fields[]": [F_PLATFORM, F_DATE, F_COUNT, F_CHANNEL, F_NOTES]})
     latest_before, today_rows = {}, {}
     for rec in logs:
         f = rec.get("fields", {})
@@ -90,13 +91,15 @@ def main():
             continue
         key = (links[0], f.get(F_PLATFORM))
         if f[F_DATE] == TODAY:
-            today_rows[key] = rec["id"]
+            # Carry whether the row came from somewhere else (Notes set), so a
+            # stale Channels figure cannot overwrite a better source.
+            today_rows[key] = (rec["id"], bool((f.get(F_NOTES) or "").strip()))
         elif f[F_DATE] < TODAY:
             prev = latest_before.get(key)
             if prev is None or f[F_DATE] > prev[0]:
                 latest_before[key] = (f[F_DATE], f.get(F_COUNT))
 
-    creates, updates = [], []
+    creates, updates, left_alone = [], [], 0
     for ch in channels:
         f = ch.get("fields", {})
         for field, platform in PLATFORM_FIELDS.items():
@@ -114,7 +117,15 @@ def main():
             if prev is not None:
                 fields[F_PREVIOUS] = prev
             if key in today_rows:
-                updates.append({"id": today_rows[key], "fields": fields})
+                rid, from_elsewhere = today_rows[key]
+                if from_elsewhere:
+                    # Social Blade (or another source) already logged today for
+                    # this account. Its figure is better than the Channels
+                    # field, which goes stale whenever a platform sync cannot
+                    # reach an account — 27 Instagram accounts today. Leave it.
+                    left_alone += 1
+                    continue
+                updates.append({"id": rid, "fields": fields})
             else:
                 creates.append({"fields": fields})
 
@@ -122,18 +133,23 @@ def main():
         write(LOGS, "POST", creates)
     if updates:
         write(LOGS, "PATCH", updates)
-    print(f"Follower Logs: {len(creates)} row(s) created, {len(updates)} updated for {TODAY}")
+    print(f"Follower Logs: {len(creates)} row(s) created, {len(updates)} updated, "
+          f"{left_alone} left to a better source, for {TODAY}")
 
 
 if __name__ == "__main__":
-    # The daily snapshot always runs first. A Social Blade backfill, when
-    # SB_MODE is set (probe | run), runs *after* it rather than in place of
-    # it: leaving the flag on then costs credits and log noise, but it can no
-    # longer silently stop the daily rows. It did exactly that from
-    # 2026-09-10 to 2026-09-21, when YouTube, X and Threads logged nothing at
-    # all because Social Blade covers only Instagram, TikTok and Facebook.
-    main()
-
+    # Social Blade first when SB_MODE is set, because for the platforms it
+    # covers it beats the Channels follower fields, which freeze whenever a
+    # platform sync cannot reach an account. The snapshot then fills only
+    # what Social Blade did not write — X, Threads, and any account it cannot
+    # see. Both always run: the backfill is wrapped so that a Social Blade
+    # failure can never stop the snapshot, which is the mistake that cost
+    # eleven days of YouTube and X history from 2026-09-10.
     if os.environ.get("SB_MODE"):
-        import socialblade_backfill
-        socialblade_backfill.main()
+        try:
+            import socialblade_backfill
+            socialblade_backfill.main()
+        except Exception as exc:
+            print(f"Social Blade step failed, continuing to the snapshot: {exc}")
+
+    main()

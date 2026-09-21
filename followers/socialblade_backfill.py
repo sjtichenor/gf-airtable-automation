@@ -127,17 +127,22 @@ def thin(rows, today):
 _existing = None
 
 
-def existing_dates(channel_id, label):
-    """Dates already logged for a channel/platform. The table is read once;
-    rows this run creates are added to the cache as it goes."""
+def existing_rows(channel_id, label):
+    """{date: None | record id} for a channel/platform. None means Social
+    Blade wrote that day itself and it is left alone. A record id means some
+    other source wrote it — the daily snapshot copying a stale follower count
+    off Channels, say — and Social Blade may correct it in place, because for
+    the platforms it covers it is the better source. The table is read once;
+    rows this run writes are folded into the cache as it goes."""
     global _existing
     if _existing is None:
         _existing = {}
-        for r in list_all(LOGS, **{"fields[]": [F_DATE, F_PLATFORM, F_CHANNEL]}):
+        for r in list_all(LOGS, **{"fields[]": [F_DATE, F_PLATFORM, F_CHANNEL, F_NOTES]}):
             f = r["fields"]
+            mine = (f.get(F_NOTES) or "").strip().startswith(NOTE)
             for cid in f.get(F_CHANNEL) or []:
-                _existing.setdefault((cid, f.get(F_PLATFORM)), set()).add(f.get(F_DATE))
-    return _existing.setdefault((channel_id, label), set())
+                _existing.setdefault((cid, f.get(F_PLATFORM)), {})[f.get(F_DATE)] = None if mine else r["id"]
+    return _existing.setdefault((channel_id, label), {})
 
 
 def channels():
@@ -213,12 +218,15 @@ def run():
             if isinstance(left, int) and left < MIN_CREDITS:
                 print(f"  credits left {left} < SB_MIN_CREDITS {MIN_CREDITS}; stopping after this profile")
                 stop = True
-            have = existing_dates(cid, label)
-            kept = [(d, n) for d, n in thin(rows, today) if d not in have]
+            have = existing_rows(cid, label)
             prev = None
-            batch = []
+            batch, fixes = [], []
             for d, n in thin(rows, today):
                 if d in have:
+                    rid = have[d]
+                    if rid is not None:  # another source wrote this day; correct it
+                        fixes.append({"id": rid, "fields": {F_COUNT: n, F_PREVIOUS: prev, F_NOTES: NOTE}})
+                        have[d] = None
                     prev = n
                     continue
                 batch.append({"fields": {F_PLATFORM: label, F_DATE: d, F_COUNT: n, F_PREVIOUS: prev,
@@ -226,10 +234,13 @@ def run():
                 prev = n
             if batch:
                 write(LOGS, "POST", batch)  # batches of 10 internally
-                have.update(r["fields"][F_DATE] for r in batch)
+                have.update({r["fields"][F_DATE]: None for r in batch})
+            if fixes:
+                write(LOGS, "PATCH", fixes)
             created += len(batch)
             print(f"  {name} / {label} ({handle}): {len(rows)} days from Social Blade, {len(batch)} rows written"
-                  f" ({rows[0][0]} → {rows[-1][0]}); credits left: {credits.get('available', '?')}")
+                  + (f", {len(fixes)} corrected" if fixes else "")
+                  + f" ({rows[0][0]} → {rows[-1][0]}); credits left: {credits.get('available', '?')}")
     summary(pulled, created, skipped, tracked, untracked)
 
 
