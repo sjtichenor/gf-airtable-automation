@@ -125,12 +125,15 @@ def main():
     print(f"Follower Logs: {len(creates)} row(s) created, {len(updates)} updated for {TODAY}")
 
 
-if __name__ == "__main__" and os.environ.get("SB_MODE"):
-    # One-off Social Blade history backfill runs instead of the snapshot when
-    # SB_MODE is set on the service (probe | run). Clear it afterwards.
-    import socialblade_backfill
-    socialblade_backfill.main()
-    sys.exit(0)
-
 if __name__ == "__main__":
+    # The daily snapshot always runs first. A Social Blade backfill, when
+    # SB_MODE is set (probe | run), runs *after* it rather than in place of
+    # it: leaving the flag on then costs credits and log noise, but it can no
+    # longer silently stop the daily rows. It did exactly that from
+    # 2026-09-10 to 2026-09-21, when YouTube, X and Threads logged nothing at
+    # all because Social Blade covers only Instagram, TikTok and Facebook.
     main()
+
+    if os.environ.get("SB_MODE"):
+        import socialblade_backfill
+        socialblade_backfill.main()
