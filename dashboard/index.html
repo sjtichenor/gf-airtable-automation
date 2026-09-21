@@ -120,14 +120,14 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
   <div class="kpis" id="kpis"></div>
 
   <div class="grid">
-    <div class="card span8"><h3>Followers over time</h3><div class="sub" id="followersSub"></div><div class="chart tall"><canvas id="cFollowers"></canvas></div></div>
-    <div class="card span4"><h3>Net follower change per day</h3><div class="sub">Gains minus losses across the selection</div><div class="chart tall"><canvas id="cNet"></canvas></div></div>
+    <div class="card span8" id="followersCard"><h3>Followers over time</h3><div class="sub" id="followersSub"></div><div class="chart tall"><canvas id="cFollowers"></canvas></div></div>
+    <div class="card span4" id="netCard"><h3>Net follower change per day</h3><div class="sub">Gains minus losses across the selection</div><div class="chart tall"><canvas id="cNet"></canvas></div></div>
 
     <div class="card span8"><h3>Views by week posted</h3><div class="sub">Lifetime views of clips, grouped by the week they went out · click a bar for the posts</div><div class="chart"><canvas id="cViewsWeek"></canvas></div></div>
     <div class="card span4"><h3>Views by platform</h3><div class="sub">Share of views in the selected range</div><div class="chart"><canvas id="cDonut"></canvas></div></div>
 
     <div class="card span6"><h3>Posting volume</h3><div class="sub" id="volumeSub">Posts per week, with average views per post</div><div class="chart"><canvas id="cVolume"></canvas></div></div>
-    <div class="card span6"><h3 id="showsTitle">Views by show</h3><div class="sub" id="showsSub">Top shows in the selected range</div><div class="chart"><canvas id="cShows"></canvas></div></div>
+    <div class="card span6" id="showsCard"><h3 id="showsTitle">Views by show</h3><div class="sub" id="showsSub">Top shows in the selected range</div><div class="chart"><canvas id="cShows"></canvas></div></div>
 
     <div class="card span12" id="audienceCard"><h3>Audience</h3><div class="sub" id="audienceSub">Instagram follower demographics for the selected accounts, latest weekly pull</div>
       <div class="grid" style="margin-top:6px">
@@ -137,7 +137,7 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
         <div class="span12"><h3 style="font-size:12px;color:var(--muted)">Top cities</h3><div class="tablewrap" style="max-height:260px"><table id="tCity"></table></div></div>
       </div>
     </div>
-    <div class="card span12"><h3>Accounts</h3><div class="sub">Follower count is the latest snapshot; changes compare against the snapshot nearest the start of each window · click a row for its posts</div><div class="tablewrap"><table id="tAccounts"></table></div></div>
+    <div class="card span12" id="accountsCard"><h3>Accounts</h3><div class="sub">Follower count is the latest snapshot; changes compare against the snapshot nearest the start of each window · click a row for its posts</div><div class="tablewrap"><table id="tAccounts"></table></div></div>
     <div class="card span6" id="editorsCard"><h3>Editors</h3><div class="sub">Clips posted in the range, by the editor who cut them</div><div class="tablewrap"><table id="tEditors"></table></div></div>
     <div class="card span6" id="topCard"><h3>Top posts</h3><div class="sub">Most viewed in the selected range</div><div class="tablewrap"><table id="tTop"></table></div></div>
   </div>
@@ -299,12 +299,23 @@ function render(){
   const dated = posts.filter(p=>p.date);
   CUR = {posts, start, end};
   const weeksIn = Math.max(1,(new Date(end)-new Date(start))/864e5/7);
+  // Some clients (a CLIENT_MATCHES one, say) have no follower history of
+  // their own, because the clips ran on an account that is not theirs.
+  // Drop the follower tile and its cards rather than draw empty axes.
+  const hasFollowers = (DATA.followers || []).length > 0;
+  ['#followersCard', '#netCard', '#accountsCard'].forEach(sel => {
+    const el = $(sel); if (el) el.style.display = hasFollowers ? '' : 'none';
+  });
+  // With no accounts of its own, "Views by account" collapses to one bar per
+  // platform, which the donut beside it already shows.
+  const showsCard = $('#showsCard');
+  if (showsCard) showsCard.style.display = (CLIENT && !DATA.channels.length) ? 'none' : '';
   const kp = [
     ['Followers', fmt(now), anySeries ? deltaHtml(fDelta, haveThen ? pct(now, then) : null) : '<span class="d">no snapshots yet</span>', 'accounts'],
     ['Posts', full(posts.length), `<span class="d">${(posts.length/weeksIn).toFixed(1)+' per week'}${!CLIENT && posts.some(p=>p.date_estimated) ? ' · '+full(posts.filter(p=>p.date_estimated).length)+' dated by log entry' : ''}</span>`, 'posts'],
     ['Videos', full(videos.length), `<span class="d">${(videos.length/weeksIn).toFixed(1)} per week · created in range</span>`, 'videos'],
     ['Views', fmt(views), `<span class="d">${full(views)}</span>`, 'posts'],
-  ];
+  ].filter(t => hasFollowers || t[3] !== 'accounts');
   kp.push(['Likes', fmt(likes), `<span class="d">${views ? (likes/views*100).toFixed(2)+'% of views' : '—'}</span>`, 'likes']);
   if (!CLIENT) kp.push(['Avg views / post', fmt(posts.length ? views/posts.length : null), `<span class="d">median ${fmt(median(posts.map(p=>p.views||0)))}</span>`, 'posts']);
   const kpiHint = k => k === 'videos' ? 'Click to see the videos created in this range'
@@ -321,7 +332,11 @@ function render(){
   renderFollowers(sel, series); renderNet(sel, series); renderViewsWeek(posts, start, end); renderDonut(posts); renderVolume(posts, start, end); renderShows(posts);
   renderAccounts(sel, series); if (!CLIENT) renderEditors(posts); renderTop(posts); renderAudience();
   $('#stamp').textContent = 'Data as of ' + new Date(DATA.generated_at).toLocaleString() + (DATA.build_seconds ? ` · pulled in ${DATA.build_seconds}s` : '');
-  $('#foot').textContent = (CLIENT ? `${MODE.name} · ` : '') + `${full(DATA.posts.length)} posts, ${full(DATA.followers.length)} follower snapshots and ${DATA.channels.length} accounts loaded. Follower history starts ${DATA.followers.length ? DATA.followers.map(f=>f.date).reduce((a,b)=>a<b?a:b) : '—'}; views are lifetime totals per post as last synced.` + (CLIENT ? ' Prepared by Good Future Media.' : '');
+  const loaded = [`${full(DATA.posts.length)} posts`];
+  if (hasFollowers) loaded.push(`${full(DATA.followers.length)} follower snapshots`, `${DATA.channels.length} accounts`);
+  const since = hasFollowers ? ` Follower history starts ${DATA.followers.map(f=>f.date).reduce((a,b)=>a<b?a:b)}.` : '';
+  $('#foot').textContent = (CLIENT ? `${MODE.name} · ` : '') + loaded.join(', ') + ' loaded.' + since
+    + ' Views are lifetime totals per post as last synced.' + (CLIENT ? ' Prepared by Good Future Media.' : '');
 }
 function median(a){ if (!a.length) return null; const s=[...a].sort((x,y)=>x-y); const m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
 function days(start, end){ const out=[]; for (let d=start; d<=end; d=addDays(d,1)) out.push(d); return out; }

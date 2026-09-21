@@ -614,17 +614,57 @@ def client_groups() -> Dict[str, dict]:
     return out
 
 
+def client_matches() -> Dict[str, dict]:
+    """Clients picked out by a word in the clip title, for work where the
+    Client field on Videos was never filled in.
+    CLIENT_MATCHES = "flock=Flock:flock;other=Name:word"
+    (slug = display name : the text to look for, case-insensitive).
+
+    These get post performance only. The clips run on our own channels
+    alongside unrelated work, so that account's followers and audience are
+    not this client's and are deliberately left out rather than shown as
+    if they were."""
+    out: Dict[str, dict] = {}
+    for part in os.environ.get("CLIENT_MATCHES", "").split(";"):
+        if "=" not in part:
+            continue
+        slug, rest = part.split("=", 1)
+        name, _, needle = rest.partition(":")
+        needle = needle.strip().lower()
+        if slug.strip() and needle:
+            out[slug.strip().lower()] = {"name": name.strip() or slug.strip(), "match": needle}
+    return out
+
+
 def client_view(snap: dict, slug: str) -> Optional[dict]:
     """The slice of the snapshot one client may see. A client is either a
     show (slug = slugified show name: that show, the channels linked to it,
-    posts on those channels or cut from its episodes) or a CLIENT_GROUPS
-    entry (a named set of accounts: exactly those channels and their posts).
-    Either way, internal attribution — editor, director, poster, client
-    account — is removed before anything leaves the server."""
+    posts on those channels or cut from its episodes), a CLIENT_GROUPS entry
+    (a named set of accounts: exactly those channels and their posts), or a
+    CLIENT_MATCHES entry (every clip whose title carries a given word,
+    wherever it ran). In all three, internal attribution — editor, director,
+    poster, client account — is removed before anything leaves the server."""
     keep = ("id", "url", "platform", "channel", "show", "title", "hook", "type", "date", "date_estimated", "created",
             "views", "likes", "comments", "replays", "reach")
+    match = client_matches().get(slug)
     group = client_groups().get(slug)
-    if group:
+    if match:
+        needle = match["match"]
+        hit = lambda text: needle in (text or "").lower()
+        # The clip title only, as asked — not the post's own hook text, which
+        # would drag in anything that happens to use the word in passing.
+        posts = [{k: p.get(k) for k in keep} for p in snap.get("posts", []) if hit(p.get("title"))]
+        if not posts:
+            return None
+        # The account these ran on is ours and carries unrelated work, so no
+        # account name, follower history or audience goes out with them.
+        for p in posts:
+            p["channel"] = None
+            p["show"] = None
+        channels, shows, primary = [], [], []
+        channel_ids = set()
+        name, logo = match["name"], None
+    elif group:
         channels = [dict(c) for c in snap.get("channels", []) if c["name"].lower() in group["channels"]]
         if not channels:
             return None
@@ -652,7 +692,11 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
     vkeep = ("id", "title", "show", "type", "created")  # no pipeline state leaves the server
-    videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if v.get("show") in show_names]
+    pick = (lambda v: hit(v.get("title"))) if match else (lambda v: v.get("show") in show_names)
+    videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if pick(v)]
+    if match:
+        for v in videos:
+            v["show"] = None
     return {
         "generated_at": snap.get("generated_at"),
         "client": {"slug": slug, "name": name, "logo": logo},
