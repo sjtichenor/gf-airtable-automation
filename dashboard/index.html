@@ -132,7 +132,7 @@ tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
     <div class="card span12" id="audienceCard"><h3>Audience</h3><div class="sub" id="audienceSub">Instagram follower demographics for the selected accounts, latest weekly pull</div>
       <div class="grid" style="margin-top:6px">
         <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Age</h3><div class="chart" style="height:200px"><canvas id="cAge"></canvas></div></div>
-        <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Gender <span class="info" tabindex="0" aria-label="About the Not specified group">i<span class="tip">"Not specified" is Instagram's own bucket for followers who never set a gender. It includes every business, brand and creator account that follows this page, plus people who skipped the field. A share of 10 to 25 percent is normal for an account followed by companies and founders.</span></span></h3><div class="chart" style="height:200px"><canvas id="cGender"></canvas></div></div>
+        <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Gender <span class="info" tabindex="0" aria-label="How this split is calculated">i<span class="tip" id="genderTip"></span></span></h3><div class="chart" style="height:200px"><canvas id="cGender"></canvas></div></div>
         <div class="span4"><h3 style="font-size:12px;color:var(--muted)">Top countries</h3><div class="chart" style="height:200px"><canvas id="cCountry"></canvas></div></div>
         <div class="span12"><h3 style="font-size:12px;color:var(--muted)">Top cities</h3><div class="tablewrap" style="max-height:260px"><table id="tCity"></table></div></div>
       </div>
@@ -407,9 +407,18 @@ function renderAudience(){
   const ageTotal = Object.values(age).reduce((a,b)=>a+b,0) || 1;
   line('cAge', {type:'bar', data:{labels: ageLabels, datasets:[{data: ageLabels.map(a=>age[a]/ageTotal*100), backgroundColor:accent, borderRadius:4}]},
     options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label: c => ` ${c.parsed.y.toFixed(1)}% · ${full(age[c.label])}`}}}, scales:{y:{ticks:{callback:v=>v+'%'}}, x:{grid:{display:false}}}}});
-  const g = agg('Gender'); const gl = Object.keys(g).sort((a,b)=>g[b]-g[a]);
-  const GCOLOR = {Men:'#2563eb', Women:'#db2777', Unknown:'#9ca3af'};
-  line('cGender', {type:'doughnut', data:{labels:gl.map(k => k==='Unknown' ? 'Not specified' : k), datasets:[{data: gl.map(k=>g[k]), backgroundColor:gl.map(k => GCOLOR[k] || '#f59e0b'), borderWidth:0}]},
+  // Instagram's "Unknown" bucket is mostly business and creator accounts. It
+  // made the split hard to read, so the chart is the men-to-women ratio among
+  // followers who state a gender; the tooltip says how many are left out.
+  const g = agg('Gender');
+  const gAll = Object.values(g).reduce((a,b)=>a+b,0);
+  const gl = Object.keys(g).filter(k => k !== 'Unknown' && k !== 'U').sort((a,b)=>g[b]-g[a]);
+  const unstated = gAll - gl.reduce((a,k)=>a+g[k],0);
+  $('#genderTip').textContent = unstated > 0
+    ? `Instagram has no stated gender for ${full(unstated)} of these followers (${(unstated/gAll*100).toFixed(0)}%), mostly business and creator accounts. They are left out so this shows the ratio of men to women.`
+    : 'Share of followers by gender, as Instagram reports it.';
+  const GCOLOR = {Men:'#2563eb', Women:'#db2777'};
+  line('cGender', {type:'doughnut', data:{labels:gl, datasets:[{data: gl.map(k=>g[k]), backgroundColor:gl.map(k => GCOLOR[k] || '#f59e0b'), borderWidth:0}]},
     options:{responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{legend, tooltip:{callbacks:{label: c => { const t = c.dataset.data.reduce((a,b)=>a+b,0); return ` ${c.label}: ${(c.parsed/t*100).toFixed(1)}% · ${full(c.parsed)}`; }}}}}});
   const co = agg('Country'); const cl = Object.keys(co).sort((a,b)=>co[b]-co[a]).slice(0,8); const coTotal = Object.values(co).reduce((a,b)=>a+b,0) || 1;
   line('cCountry', {type:'bar', data:{labels: cl.map(c=>COUNTRY[c]||c), datasets:[{data: cl.map(c=>co[c]/coTotal*100), backgroundColor:accent, borderRadius:4, barThickness:12}]},
