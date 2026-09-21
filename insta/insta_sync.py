@@ -907,6 +907,66 @@ class InstagramDynamicSync:
         
         return len(self.username_to_page_data) > 0
 
+    # The Page walk above only finds Instagram accounts that have a Facebook
+    # Page linked to them. Eleven of ours have none, so nothing ever refreshed
+    # their follower counts and the Channels table kept serving whatever it
+    # last held. The business knows about those accounts anyway, but only a
+    # system-user token is allowed to ask it, which is what
+    # META_SYSTEM_USER_TOKEN is for. Accounts the Page walk already found are
+    # left alone -- this only fills the gaps.
+    def add_business_instagram_accounts(self):
+        sys_tok = os.getenv('META_SYSTEM_USER_TOKEN')
+        biz = os.getenv('META_BUSINESS_ID')
+        if not (sys_tok and biz):
+            return 0
+
+        print("\nAsking the business for Instagram accounts the Page walk missed...")
+        added = 0
+        for edge in ('owned_instagram_accounts', 'client_instagram_accounts'):
+            try:
+                response = requests.get(
+                    f"{self.meta_base_url}/{biz}/{edge}",
+                    params={'fields': 'id,username,followers_count',
+                            'access_token': sys_tok, 'limit': 100},
+                    timeout=30)
+            except Exception as e:
+                print(f"   {edge}: {e}")
+                continue
+
+            if response.status_code != 200:
+                print(f"   {edge}: HTTP {response.status_code} {response.text[:200]}")
+                continue
+
+            accounts = response.json().get('data', [])
+            print(f"   {edge}: {len(accounts)} account(s)")
+
+            for ig in accounts:
+                username = ig.get('username')
+                if not username or username in self.username_to_page_data:
+                    continue
+
+                followers = ig.get('followers_count')
+                if followers is None:
+                    # Some edges return the node without the count; ask for it.
+                    info = self.get_instagram_username(ig['id'], sys_tok)
+                    followers = (info or {}).get('followers_count')
+                if followers is None:
+                    print(f"      @{username}: no follower count returned, skipping")
+                    continue
+
+                self.username_to_page_data[username] = {
+                    'page_id': None,
+                    'page_name': edge,
+                    'page_access_token': sys_tok,
+                    'ig_account_id': ig['id'],
+                    'followers_count': followers
+                }
+                added += 1
+                print(f"      @{username}: {followers:,} followers")
+
+        print(f"   {added} account(s) added that the Page walk could not see")
+        return added
+
     def get_all_posts_from_airtable(self):
         """Get all posts from Posts table"""
         all_posts = []
@@ -1477,6 +1537,9 @@ class InstagramDynamicSync:
         # Build mapping (includes follower counts)
         if not self.build_instagram_mapping():
             print("Failed to build Instagram mapping")
+        self.add_business_instagram_accounts()
+        if not self.username_to_page_data:
+            print("No Instagram accounts reachable, nothing to sync")
             return
         
         # Get channels from Airtable
