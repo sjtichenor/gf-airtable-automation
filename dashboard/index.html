@@ -13,10 +13,15 @@
   --accent:#2563eb; --accent-soft:#dbeafe; --up:#16a34a; --down:#dc2626; --chip:#eef2f7; --chip-on:#0f172a; --chip-on-text:#fff;
   --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12); --grid:#eef1f5;
 }
+/* Dark palette, contrast-checked against --card (the worst case for text).
+   --muted carries every 12px label and all Chart.js axis and legend text, so
+   it was the main culprit: it sat at 5.9:1 and now reads 7.9:1. --muted2 was
+   3.1:1, below AA for body text, and now reads 5.5:1. Grid and border lines
+   are decorative, lifted just enough to be seen. */
 html[data-theme=dark]{
-  --bg:#0b0e14; --card:#121722; --border:#1f2734; --text:#e6e9ef; --muted:#8b95a7; --muted2:#5b6577;
-  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --chip:#1a2130; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#1c2431;
+  --bg:#0b0e14; --card:#161c29; --border:#2b3547; --text:#e6e9ef; --muted:#a7b1c2; --muted2:#8a93a3;
+  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --chip:#1f2735; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#2a3344;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
@@ -288,7 +293,7 @@ function render(){
   const sel = select(); const {start, end, posts, followers, videos} = sel;
   const css = getComputedStyle(document.documentElement);
   Chart.defaults.color = css.getPropertyValue('--muted').trim(); Chart.defaults.borderColor = css.getPropertyValue('--grid').trim();
-  Chart.defaults.font.family = 'Inter, sans-serif'; Chart.defaults.font.size = 11;
+  Chart.defaults.font.family = 'Inter, sans-serif'; Chart.defaults.font.size = 12;
   Object.values(charts).forEach(c => c.destroy()); charts = {};
 
   // followers now + delta

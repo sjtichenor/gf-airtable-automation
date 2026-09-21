@@ -12,10 +12,13 @@
   --accent:#2563eb; --accent-soft:#dbeafe; --up:#16a34a; --down:#dc2626; --warn:#d97706; --chip:#eef2f7; --chip-on:#0f172a; --chip-on-text:#fff;
   --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12); --grid:#eef1f5; --cell:#e9edf3;
 }
+/* Kept in step with the same block in index.html. --muted (every 12px label)
+   went from 5.9:1 to 7.9:1 against --card, --muted2 from 3.1:1 to 5.5:1, and
+   --cell lifted so an empty heatmap square still reads against the new card. */
 html[data-theme=dark]{
-  --bg:#0b0e14; --card:#121722; --border:#1f2734; --text:#e6e9ef; --muted:#8b95a7; --muted2:#5b6577;
-  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --warn:#fbbf24; --chip:#1a2130; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#1c2431; --cell:#1a2130;
+  --bg:#0b0e14; --card:#161c29; --border:#2b3547; --text:#e6e9ef; --muted:#a7b1c2; --muted2:#8a93a3;
+  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --warn:#fbbf24; --chip:#1f2735; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#2a3344; --cell:#232c3d;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
