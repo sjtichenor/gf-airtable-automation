@@ -358,7 +358,8 @@ function renderViewsWeek(posts, start, end){
   posts.forEach(p => { if (!p.date) return; const i = idx.get(weekStart(p.date)); if (i!=null && data[p.platform]) data[p.platform][i] += p.views||0; });
   line('cViewsWeek', {type:'bar', data:{labels: ws.map(monthLabel), datasets: plats.map(p=>({label:p, data:data[p], backgroundColor:PCOLORS[p], borderRadius:2, stack:'v'}))},
     options:clickable({responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend, tooltip:{callbacks:{label: c => ` ${c.dataset.label}: ${full(c.parsed.y)}`}}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{maxTicksLimit:12}}, y:{stacked:true, ticks:{callback:fmt}}}},
-      (el, chart) => { const w = ws[el.index]; const p = plats[el.datasetIndex]; openDrill(`Week of ${nice(w)} · ${p}`, posts.filter(x => inWeek(x, w) && x.platform === p)); })});
+      (el, chart, precise) => { const w = ws[el.index]; const p = precise ? plats[el.datasetIndex] : null;
+        openDrill(p ? `Week of ${nice(w)} · ${p}` : `Week of ${nice(w)}`, posts.filter(x => inWeek(x, w) && (!p || x.platform === p))); })});
 }
 function renderDonut(posts){
   const m = {}; posts.forEach(p => m[p.platform] = (m[p.platform]||0) + (p.views||0));
@@ -433,7 +434,19 @@ function openDrill(title, list, sortKey){
 $('#drawerClose').onclick = () => { $('#drawer').hidden = true; };
 $('#drawer').addEventListener('click', e => { if (e.target === $('#drawer')) $('#drawer').hidden = true; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#drawer').hidden = true; });
-const clickable = (opts, handler) => Object.assign(opts, {onClick: (evt, els, chart) => { if (els.length) handler(els[0], chart); }, onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; }});
+// Charts using interaction mode 'index' get a tooltip listing every series at
+// that x, but their onClick is then handed all of those elements in dataset
+// order, so els[0] is always the first series no matter which segment was
+// clicked. Re-resolve the exact element under the cursor and tell the handler
+// whether it is a real hit (precise) or a loose click somewhere in the column.
+function segmentAt(chart, evt){
+  for (const e of [evt, evt && evt.native]) {
+    if (!e) continue;
+    try { const hit = chart.getElementsAtEventForMode(e, 'nearest', {intersect: true}, false); if (hit.length) return hit[0]; } catch (_) {}
+  }
+  return null;
+}
+const clickable = (opts, handler) => Object.assign(opts, {onClick: (evt, els, chart) => { const hit = segmentAt(chart, evt); if (hit) handler(hit, chart, true); else if (els.length) handler(els[0], chart, false); }, onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; }});
 const inWeek = (p, w) => p.date && weekStart(p.date) === w;
 
 // ── tables ─────────────────────────────────────────────────────────────
