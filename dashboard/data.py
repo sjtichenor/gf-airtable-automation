@@ -652,6 +652,28 @@ def client_matches() -> Dict[str, dict]:
     return out
 
 
+def client_video_accounts() -> Dict[str, set]:
+    """Clients whose videos are identified by the Client Account link on
+    Videos rather than by show name.
+    CLIENT_VIDEO_ACCOUNTS = "solana=Solana;other=Name A|Name B"
+    (slug = Client Account name(s) in the Clients table, separated by |).
+
+    Show name is a poor selector wherever the Show formula falls through to
+    the channel: a video on two of the client's accounts comes back as
+    "Show, Show" and one on no account at all comes back empty, so both drop
+    out. Solana lost 94 of its 419 videos that way. The Client Account link is
+    the field that actually means "this is theirs"."""
+    out: Dict[str, set] = {}
+    for part in os.environ.get("CLIENT_VIDEO_ACCOUNTS", "").split(";"):
+        if "=" not in part:
+            continue
+        slug, rest = part.split("=", 1)
+        names = {n.strip().lower() for n in rest.split("|") if n.strip()}
+        if slug.strip() and names:
+            out[slug.strip().lower()] = names
+    return out
+
+
 def no_follower_clients() -> set:
     """Client slugs whose account followers are not theirs to claim.
     CLIENT_NO_FOLLOWERS = "solana;other" (slugs, separated by ; or ,).
@@ -739,7 +761,16 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
     vkeep = ("id", "title", "show", "type", "created", "views", "posts")  # no pipeline state leaves the server
-    pick = (lambda v: hit(v.get("title"))) if match else (lambda v: v.get("show") in show_names)
+    accounts = client_video_accounts().get((slug or "").strip().lower())
+    if match:
+        pick = lambda v: hit(v.get("title"))
+    elif accounts:
+        pick = lambda v: (v.get("client") or "").strip().lower() in accounts
+    else:
+        # The Show lookup joins with ", " when a video hangs off more than one
+        # channel, so "Show, Show" has to match Show. Plain equality dropped
+        # every such video.
+        pick = lambda v: bool(show_names & {x.strip() for x in (v.get("show") or "").split(",") if x.strip()})
     videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if pick(v)]
     # Videos are selected by show name, so the show can only be dropped once
     # that selection has happened.
