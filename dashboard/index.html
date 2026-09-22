@@ -318,7 +318,7 @@ function render(){
   // With no accounts of its own, "Views by account" collapses to one bar per
   // platform, which the donut beside it already shows.
   const showsCard = $('#showsCard');
-  if (showsCard) showsCard.style.display = (CLIENT && !DATA.channels.length) ? 'none' : '';
+  if (showsCard) showsCard.style.display = (CLIENT && (!DATA.channels.length || !DATA.shows.length)) ? 'none' : '';
   const kp = [
     ['Followers', fmt(now), anySeries ? deltaHtml(fDelta, haveThen ? pct(now, then) : null) : '<span class="d">no snapshots yet</span>', 'accounts'],
     ['Posts', full(posts.length), `<span class="d">${(posts.length/weeksIn).toFixed(1)+' per week'}${!CLIENT && posts.some(p=>p.date_estimated) ? ' · '+full(posts.filter(p=>p.date_estimated).length)+' dated by log entry' : ''}</span>`, 'posts'],
@@ -466,9 +466,12 @@ function openVideoDrill(title, list){
   $('#drawerTitle').textContent = title;
   $('#drawerSub').textContent = `${full(rows.length)} video${rows.length===1?'':'s'} created in this range · `
     + `${full(tv)} views across every post they became · click a column to sort`;
-  const cols = [{h:'Video', k:'title', t:true, f: r => `<span title="${esc(r.title)}">${esc(r.title)}</span>`},
-                {h:'Show', k:'show'}, {h:'Type', k:'type'}];
-  if (!CLIENT) cols.push({h:'Status', k:'status'}, {h:'Editor', k:'editor'});
+  const cols = [{h:'Video', k:'title', t:true, f: r => `<span title="${esc(r.title)}">${esc(r.title)}</span>`}];
+  // Show only when we actually have one: a client whose show attribution was
+  // dropped gets a column of blanks otherwise. Type is internal — telling a
+  // client a vertical clip is a vertical clip says nothing.
+  if (rows.some(r => r.show)) cols.push({h:'Show', k:'show'});
+  if (!CLIENT) cols.push({h:'Type', k:'type'}, {h:'Status', k:'status'}, {h:'Editor', k:'editor'});
   cols.push({h:'Posts', k:'posts', n:true}, {h:'Views', k:'views', n:true}, {h:'Created', k:'created'});
   if (!CLIENT) cols.push({h:'Finished', k:'finished'});
   state.sort.tDrill = {k:'views', d:'desc'};

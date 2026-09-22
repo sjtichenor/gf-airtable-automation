@@ -664,6 +664,21 @@ def no_follower_clients() -> set:
     return {s.strip().lower() for s in raw.replace(",", ";").split(";") if s.strip()}
 
 
+def no_show_clients() -> set:
+    """Client slugs whose show attribution is not worth showing.
+    CLIENT_NO_SHOWS = "solana;other" (slugs, separated by ; or ,).
+
+    A video's Show is a formula: the episode's show when it has an episode,
+    otherwise the show its channel is linked to. For an account whose clips
+    are cut from conference talks, interviews and other people's podcasts
+    rather than from our own episodes, every video falls through to that
+    second branch and gets labelled with the one show hanging off the
+    account -- which is not where any of it came from. Better to say nothing
+    than to tell a client their clips came from a show they did not make."""
+    raw = os.environ.get("CLIENT_NO_SHOWS", "")
+    return {s.strip().lower() for s in raw.replace(",", ";").split(";") if s.strip()}
+
+
 def client_view(snap: dict, slug: str) -> Optional[dict]:
     """The slice of the snapshot one client may see. A client is either a
     show (slug = slugified show name: that show, the channels linked to it,
@@ -726,9 +741,16 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     vkeep = ("id", "title", "show", "type", "created", "views", "posts")  # no pipeline state leaves the server
     pick = (lambda v: hit(v.get("title"))) if match else (lambda v: v.get("show") in show_names)
     videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if pick(v)]
-    if match:
+    # Videos are selected by show name, so the show can only be dropped once
+    # that selection has happened.
+    hide_shows = (slug or "").strip().lower() in no_show_clients()
+    if match or hide_shows:
         for v in videos:
             v["show"] = None
+    if hide_shows:
+        for p in posts:
+            p["show"] = None
+        primary = []
     return {
         "generated_at": snap.get("generated_at"),
         "client": {"slug": slug, "name": name, "logo": logo},
