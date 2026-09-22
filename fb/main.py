@@ -714,6 +714,26 @@ class FacebookSync:
                     'page_access_token': page_token
                 }
 
+    # A Channels row and its FACEBOOK_PAGES entry are matched on the name, and
+    # the two are typed by different people: "US In Common" in Airtable,
+    # "US in Common" on the Page. One capital letter kept that account out of
+    # the follower sync for good, its count frozen at 1,455 while the real
+    # figure passed 9,000. Compare loosely, and fall back to the Page id when
+    # the Facebook Profile URL carries one (Solana's does).
+    @staticmethod
+    def _loose(name):
+        return ''.join(ch for ch in (name or '').lower() if ch.isalnum())
+
+    def page_info_for_channel(self, channel_name, facebook_profile=''):
+        wanted = self._loose(channel_name)
+        for page_name, info in self.page_name_to_info.items():
+            if self._loose(page_name) == wanted:
+                return info
+        for page_id, token in self.page_id_to_token.items():
+            if page_id and page_id in (facebook_profile or ''):
+                return {'page_id': page_id, 'page_access_token': token}
+        return None
+
     def resolve_facebook_share_url(self, share_url):
         """Resolve Facebook share URL to get the actual post URL"""
         try:
@@ -1318,11 +1338,12 @@ class FacebookSync:
                 }
                 
                 # Check if this channel has a corresponding Facebook page
-                if channel_name in self.page_name_to_info:
+                page_info = self.page_info_for_channel(channel_name, facebook_profile)
+                if page_info:
                     facebook_channels.append({
                         'channel_name': channel_name,
                         'record_info': channel_mapping[channel_name],
-                        'page_info': self.page_name_to_info[channel_name]
+                        'page_info': page_info
                     })
                     print(f"   • {channel_name} → {current_followers:,} followers")
         
