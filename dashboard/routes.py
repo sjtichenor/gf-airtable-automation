@@ -52,6 +52,83 @@ def home(request: Request):
     return HTMLResponse(_page_with_mode({"mode": "team"}))
 
 
+# Built from the live configuration rather than a hand-kept list, so a client
+# added or dropped is reflected here without anyone remembering to edit it.
+def _client_rows() -> str:
+    from .data import (client_groups, client_matches, client_video_accounts,
+                       no_follower_clients, no_show_clients)
+    groups, matches = client_groups(), client_matches()
+    hidden_followers, hidden_shows = no_follower_clients(), no_show_clients()
+    by_account = client_video_accounts()
+    snap = cache.snapshot or {}
+    channel_names = {c["name"].lower(): c["name"] for c in snap.get("channels", [])}
+
+    rows = []
+    for slug in sorted(auth.client_passwords()):
+        match, group = matches.get(slug), groups.get(slug)
+        if match:
+            name, kind = match["name"], "by title word"
+            desc = (f'Every clip whose title carries \u201c{match["match"]}\u201d, wherever it ran. Post '
+                    "performance only \u2014 the clips sit on our own accounts alongside unrelated "
+                    "work, so no account names, followers or audience go out.")
+        elif group:
+            name, kind = group["name"], "by accounts"
+            listed = [channel_names.get(c, c.title()) for c in group["channels"]]
+            desc = "Accounts: " + ", ".join(listed) + "."
+        else:
+            show = next((sh for sh in snap.get("shows", []) if slugify(sh["name"]) == slug), None)
+            name = show["name"] if show else slug.replace("-", " ").title()
+            kind = "by show"
+            desc = ("The show, the accounts linked to it, and posts either on those accounts "
+                    "or cut from its episodes.")
+
+        caveats = []
+        if slug in hidden_followers:
+            caveats.append("Followers are hidden, because plenty of people post to those accounts besides us")
+        if slug in by_account:
+            caveats.append("videos are matched by Client Account rather than show name")
+        if slug in hidden_shows:
+            caveats.append("show attribution is dropped")
+        if caveats:
+            desc += " " + caveats[0][0].upper() + caveats[0][1:] + (
+                ("; " + "; ".join(caveats[1:])) if len(caveats) > 1 else "") + "."
+
+        rows.append(
+            '<li><a class="row" href="/clients/{slug}">'
+            '<span class="name">{name} <span class="arrow">&rarr;</span></span>'
+            '<span class="tag client">{kind}</span>'
+            '<span class="path">/clients/{slug}</span>'
+            '<span class="desc">{desc}</span></a></li>'.format(
+                slug=html.escape(slug), name=html.escape(name),
+                kind=html.escape(kind), desc=html.escape(desc)))
+
+    if not rows:
+        rows.append('<li><a class="row" href="/dashboard"><span class="name">No client reports yet</span>'
+                    '<span class="desc">A client appears here once its slug is in CLIENT_PASSWORDS.</span></a></li>')
+    return "".join(rows)
+
+
+def _every_minutes() -> str:
+    seconds = int(os.environ.get("DASHBOARD_REFRESH_SECONDS", "900"))
+    if seconds % 60:
+        return f"{seconds} seconds"
+    minutes = seconds // 60
+    return "minute" if minutes == 1 else f"{minutes} minutes"
+
+
+@router.get("/links", response_class=HTMLResponse)
+def links(request: Request):
+    if not auth.is_authed(request):
+        return RedirectResponse("/dashboard/login", status_code=303)
+    n = len(auth.client_passwords())
+    note = f"{n} report{'' if n == 1 else 's'} \u00b7 one password each \u00b7 attribution stripped server-side"
+    page = (_read("links.html")
+            .replace("<!--CLIENTS-->", _client_rows())
+            .replace("<!--CLIENT_NOTE-->", html.escape(note))
+            .replace("<!--REFRESH-->", html.escape(_every_minutes())))
+    return HTMLResponse(page)
+
+
 def _page_with_mode(mode: dict) -> str:
     import json
     return _read("index.html").replace("<!--MODE-->", "<script>window.GF_MODE=" + json.dumps(mode) + "</script>")
