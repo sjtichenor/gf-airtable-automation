@@ -212,6 +212,7 @@ async function load(){
   if (r.status === 401) { location.href = LOGIN_URL; return; }
   if (r.status === 503) { const s = await r.json(); $('#ovmsg').textContent = s.last_error ? 'Last refresh failed: '+s.last_error+' — retrying' : 'First load pulls everything from Airtable; about a minute…'; setTimeout(load, 5000); return; }
   DATA = await r.json();
+  _videoChannels = null;
   DATA.channels.forEach(c => byId[c.id] = c); DATA.shows.forEach(s => byId[s.id] = s);
   buildFilters(); $('#overlay').style.display='none'; render();
 }
@@ -259,6 +260,25 @@ function range(){
   return {start, end};
 }
 function channelOk(c){ return c && (!state.show || c.shows.includes(state.show)) && (!state.channel || c.id===state.channel) && (!state.owned || c.owned); }
+// A video's Show is a formula: blank when it has neither an episode nor a
+// channel, and "Show, Show" when it sits on two of them. Never compare it
+// whole.
+const showsOf = v => new Set(String(v.show || '').split(',').map(x => x.trim()).filter(Boolean));
+// video id -> the set of accounts its posts went out on. Built from every
+// post, not the filtered ones, or narrowing the range would unlink a video
+// from the account that posted it.
+let _videoChannels = null;
+function videoChannels(){
+  if (_videoChannels) return _videoChannels;
+  _videoChannels = new Map();
+  (DATA.posts || []).forEach(p => {
+    if (!p.video || !p.channel) return;
+    let set = _videoChannels.get(p.video);
+    if (!set) _videoChannels.set(p.video, set = new Set());
+    set.add(p.channel);
+  });
+  return _videoChannels;
+}
 function select(){
   const {start, end} = range();
   const showName = state.show ? byId[state.show].name : '';
@@ -275,8 +295,12 @@ function select(){
   const followers = DATA.followers.filter(f => state.platforms.has(f.platform) && channelOk(byId[f.channel]) && f.date <= end);
   const videos = (DATA.videos||[]).filter(v => {
     if (state.editor && v.editor !== state.editor) return false;
-    if (state.show && v.show !== showName) return false;
-    if (state.channel) { const c = byId[state.channel]; if (!c || !c.shows.some(sid => byId[sid]?.name === v.show)) return false; }
+    const chans = videoChannels().get(v.id);
+    // A video has no account of its own; it belongs to the accounts its posts
+    // went out on. Matching on show name instead used to zero this tile out.
+    if (state.channel && !(chans && chans.has(state.channel))) return false;
+    if (state.show && !(showsOf(v).has(showName)
+        || (chans && [...chans].some(id => byId[id]?.shows?.includes(state.show))))) return false;
     const d = v.created ? String(v.created).slice(0,10) : null; return d && d >= start && d <= end;
   });
   return {start, end, posts, followers, videos};

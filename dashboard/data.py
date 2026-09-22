@@ -349,6 +349,10 @@ def build_snapshot() -> dict:
             "url": f.get(PO["url"]),
             "platform": norm_platform(f.get(PO["network"])),
             "channel": ch if ch in channels else None,
+            # Which video this post came from. A video has no account of its
+            # own, so this is the only honest way to say which accounts it
+            # went out on.
+            "video": _first(f.get(PO["video"])) or None,
             "show": vid.get("show") or "",
             "editor": vid.get("editor"),
             "client": vid.get("client"),
@@ -518,9 +522,13 @@ def fake_snapshot() -> dict:
         p = rnd.choice(list(ch["followers"].keys()))
         day = today - timedelta(days=int(rnd.expovariate(1 / 120)) % 400)
         views = int(rnd.lognormvariate(8, 1.3))
+        # Point the post at a video of the same show, so the video-to-account
+        # mapping the page builds from posts has something real to chew on.
+        si = int(ch["id"][2])
         posts.append({
             "id": f"post{n}", "url": "https://example.com/p", "platform": p, "channel": ch["id"],
-            "show": show_names[int(ch["id"][2])], "editor": rnd.choice(editors), "client": None,
+            "video": f"v{(n % 150) * 6 + si}",
+            "show": show_names[si], "editor": rnd.choice(editors), "client": None,
             "title": f"Clip {n}: something someone said", "hook": "", "type": "Clip",
             "date": day.isoformat(), "created": day.isoformat(),
             "created_at": f"{day.isoformat()}T{rnd.randint(13, 23):02d}:{rnd.randint(0, 59):02d}:00.000Z", "poster": rnd.choice(posters),
@@ -709,8 +717,8 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     CLIENT_MATCHES entry (every clip whose title carries a given word,
     wherever it ran). In all three, internal attribution — editor, director,
     poster, client account — is removed before anything leaves the server."""
-    keep = ("id", "url", "platform", "channel", "show", "title", "hook", "type", "date", "date_estimated", "created",
-            "views", "likes", "comments", "replays", "reach")
+    keep = ("id", "url", "platform", "channel", "video", "show", "title", "hook", "type", "date", "date_estimated",
+            "created", "views", "likes", "comments", "replays", "reach")
     match = client_matches().get(slug)
     group = client_groups().get(slug)
     if match:
