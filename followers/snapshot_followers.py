@@ -17,7 +17,7 @@ Environment
 
 import os
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import requests
 
@@ -37,6 +37,17 @@ PLATFORM_FIELDS = {
     "Threads Followers": "Threads",
 }
 CHANNEL_NAME = "Social Media Account"  # the Channels primary field
+CHANNEL_STATUS = "Status"
+# Platform -> Channels profile-URL field. A profile with no count is itself a
+# finding, so the audit needs to know which platforms an account is on.
+PROFILE_FIELDS = {
+    "Instagram": "IG Profile",
+    "TikTok": "TikTok Profile",
+    "X": "Twitter Profile",
+    "YouTube": "YouTube Profile",
+    "Facebook": "Facebook Profile",
+    "Threads": "Threads Profile",
+}
 
 # Follower Logs fields (by name; the table was built by hand in the UI).
 F_PLATFORM = "Platform"
@@ -137,6 +148,42 @@ def main():
           f"{left_alone} left to a better source, for {TODAY}")
 
 
+# Runs after the snapshot has finished writing, never before, so a health
+# complaint can never cost a day of data. Prints the report every day; when
+# something needs acting on and HEALTH_ALERT is not "0", exits 3 so Render
+# sends its cron-failed email -- the only push channel we have until Slack is
+# wired. HEALTH_IGNORE mutes known cases: "Good Politics/Instagram;Steelman/*".
+def health_check():
+    import health
+    fields = [CHANNEL_NAME, CHANNEL_STATUS, *PLATFORM_FIELDS, *PROFILE_FIELDS.values()]
+    channels = []
+    for rec in list_all(CHANNELS, **{"fields[]": fields}):
+        f = rec.get("fields", {})
+        status = f.get(CHANNEL_STATUS)
+        status = status.get("name") if isinstance(status, dict) else status
+        channels.append({
+            "id": rec["id"], "name": f.get(CHANNEL_NAME) or rec["id"],
+            "active": status == "Active",
+            "profiles": {p: f.get(fld) for p, fld in PROFILE_FIELDS.items()},
+            "counts": {p: f.get(fld) for fld, p in PLATFORM_FIELDS.items()},
+        })
+    since = (date.fromisoformat(TODAY) - timedelta(days=7)).isoformat()
+    logs = []
+    for rec in list_all(LOGS, filterByFormula=f"IS_AFTER({{{F_DATE}}}, '{since}')",
+                        **{"fields[]": [F_PLATFORM, F_DATE, F_COUNT, F_CHANNEL, F_NOTES]}):
+        f = rec.get("fields", {})
+        links = f.get(F_CHANNEL) or []
+        if links:
+            logs.append({"channel": links[0], "platform": f.get(F_PLATFORM), "date": f.get(F_DATE),
+                         "count": f.get(F_COUNT),
+                         "independent": (f.get(F_NOTES) or "").strip().startswith("Social Blade")})
+    ignore = [x for x in os.environ.get("HEALTH_IGNORE", "").replace(",", ";").split(";") if x.strip()]
+    findings = health.audit(channels, logs, today=TODAY, ignore=ignore)
+    print("\n" + health.render(findings))
+    if any(f["severity"] == 2 for f in findings) and os.environ.get("HEALTH_ALERT", "1") != "0":
+        sys.exit(3)
+
+
 if __name__ == "__main__":
     # Social Blade first when SB_MODE is set, because for the platforms it
     # covers it beats the Channels follower fields, which freeze whenever a
@@ -153,3 +200,9 @@ if __name__ == "__main__":
             print(f"Social Blade step failed, continuing to the snapshot: {exc}")
 
     main()
+    try:
+        health_check()
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"Health check failed to run, snapshot itself is fine: {exc}")
