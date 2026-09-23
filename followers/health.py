@@ -67,9 +67,16 @@ def audit(channels, logs, today=None, stale_days=2, flat_days=3, flat_min=100, d
             rows = by_key.get((ch["id"], platform), [])
             field = (ch.get("counts") or {}).get(platform)
             latest = rows[-1] if rows else None
+            independent = [r for r in rows if r[2]]
 
             if field is None:
-                findings.append(_f(ch, platform, "NO FIELD", "profile listed, follower field never written", 1))
+                finding = _f(ch, platform, "NO FIELD", "profile listed, follower field never written", 1)
+                if independent:
+                    # Social Blade has the number even though nothing ever
+                    # copied it across; a caller can fill the field from it.
+                    d, n, _ = independent[-1]
+                    finding.update(channel_id=ch["id"], sb_count=n, sb_date=d)
+                findings.append(finding)
 
             if platform in LOGGED_DAILY:
                 if not latest:
@@ -89,7 +96,6 @@ def audit(channels, logs, today=None, stale_days=2, flat_days=3, flat_min=100, d
             # A row copied out of the Channels field cannot disagree with it
             # in any meaningful way, so compare against the newest row that
             # Social Blade wrote itself.
-            independent = [r for r in rows if r[2]]
             if independent and field is not None:
                 d, n, _ = independent[-1]
                 gap = abs(field - n) / max(n, 1) * 100
@@ -119,10 +125,11 @@ def render(findings):
     lines = [f"DATA HEALTH: {len(act)} to act on, {len(look)} to look at"]
     for f in act:
         lines.append(f"  !! {f['channel']} / {f['platform']}: {f['check']} - {f['detail']}")
+    # A filled NO FIELD is worth its own line; the rest are grouped.
     for f in look:
-        if f["check"] != "NO FIELD":
+        if f["check"] != "NO FIELD" or "filled" in f["detail"]:
             lines.append(f"   . {f['channel']} / {f['platform']}: {f['check']} - {f['detail']}")
-    nofield = [f for f in look if f["check"] == "NO FIELD"]
+    nofield = [f for f in look if f["check"] == "NO FIELD" and "filled" not in f["detail"]]
     if nofield:
         lines.append("   . NO FIELD (profile listed, follower field never written): "
                      + ", ".join(f"{f['channel']}/{f['platform']}" for f in nofield))

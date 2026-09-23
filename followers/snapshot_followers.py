@@ -192,8 +192,11 @@ def health_check():
 # two disagree and Social Blade's row is fresh, put its figure into the
 # field so the interface stops showing a frozen number. A reachable account
 # gets overwritten again by the official sync later the same day, which is
-# fine: that figure is better and the gap between them is small. Muted
-# pairs (HEALTH_IGNORE) are left alone entirely -- mute means do not touch.
+# fine: that figure is better and the gap between them is small. An empty
+# field with a Social Blade row behind it is filled the same way -- ThursdAI
+# and Solana Clipped had months of daily rows that nothing ever copied
+# across. Muted pairs (HEALTH_IGNORE) are left alone entirely -- mute means
+# do not touch.
 # A filled finding drops to "look" severity: the number people see is now
 # right, and the log still records that the official sync is lagging.
 def fill_from_socialblade(findings):
@@ -203,10 +206,13 @@ def fill_from_socialblade(findings):
     today = date.fromisoformat(TODAY)
     updates, filled = [], []
     for f in findings:
-        if f.get("check") != "DIVERGES" or not f.get("sb_date"):
+        if f.get("check") not in ("DIVERGES", "NO FIELD") or not f.get("sb_date"):
             continue
-        if (today - date.fromisoformat(f["sb_date"])).days > 1:
-            continue  # stale Social Blade row is no better than a stale field
+        # Social Blade skips the odd day for smaller accounts, so accept a row
+        # up to three days old: that is still far better than a field that is
+        # frozen or empty, which is the only kind that reaches this point.
+        if (today - date.fromisoformat(f["sb_date"])).days > 3:
+            continue
         field = field_for.get(f["platform"])
         if not field:
             continue
