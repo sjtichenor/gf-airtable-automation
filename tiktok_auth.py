@@ -53,7 +53,7 @@ from urllib.parse import urlencode
 import requests
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 
 log = logging.getLogger("tiktok_auth")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -134,7 +134,8 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8">
  th{{font-weight:600;color:#444}} td.n{{text-align:right;font-variant-numeric:tabular-nums}}
  .ok{{background:#e8f7ee;border:1px solid #b6e3c6;padding:12px 14px;border-radius:8px}}
  .err{{background:#fdecec;border:1px solid #f3b6b6;padding:12px 14px;border-radius:8px}}
-</style></head><body>{body}</body></html>"""
+</style><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+</head><body>{body}</body></html>"""
 
 
 def page(title: str, body: str, status: int = 200) -> HTMLResponse:
@@ -143,6 +144,40 @@ def page(title: str, body: str, status: int = 200) -> HTMLResponse:
 
 def esc(value) -> str:
     return html.escape(str(value if value is not None else ""))
+
+
+_STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard", "static")
+_ICONS = {
+    "favicon.ico": "image/x-icon",
+    "favicon.svg": "image/svg+xml",
+    "favicon-32.png": "image/png",
+    "apple-touch-icon.png": "image/png",
+}
+
+
+def _icon(name: str):
+    return FileResponse(os.path.join(_STATIC, name), media_type=_ICONS[name],
+                        headers={"Cache-Control": "public, max-age=604800"})
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico():
+    return _icon("favicon.ico")
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon_svg():
+    return _icon("favicon.svg")
+
+
+@app.get("/favicon-32.png", include_in_schema=False)
+def favicon_png():
+    return _icon("favicon-32.png")
+
+
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+def apple_touch_icon():
+    return _icon("apple-touch-icon.png")
 
 
 @app.get("/", response_class=HTMLResponse)
