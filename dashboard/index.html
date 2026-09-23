@@ -550,7 +550,11 @@ function renderAccounts({start,end,posts}, series){
   const keys = new Set([...series.keys(), ...Object.keys(pv)]);
   keys.forEach(k => { const [ch, p] = k.split('|'); const c = byId[ch]; if (!channelOk(c) || !state.platforms.has(p)) return; const arr = series.get(k) || [];
     const now = arr.length ? valueAt(arr, end) : (c.followers[p] ?? null);
-    const d7 = arr.length>1 ? valueAt(arr, addDays(end,-7)) : null, d30 = arr.length>1 ? valueAt(arr, addDays(end,-30)) : null;
+    // When the window starts before we began tracking the account, measure
+    // from the first snapshot instead of showing nothing -- otherwise a young,
+    // fast-growing account sorts under "no data" and looks like it is missing.
+    const since = d => arr.length>1 ? (valueAt(arr, d) ?? firstOnOrAfter(arr, d)) : null;
+    const d7 = since(addDays(end,-7)), d30 = since(addDays(end,-30));
     const t = arr.length>1 ? (valueAt(arr, addDays(start,-1)) ?? firstOnOrAfter(arr, start)) : null;
     rows.push({account:c.name, channel:ch, photo:c.photo, platform:p, now, c7: d7!=null&&now!=null ? now-d7 : null, c30: d30!=null&&now!=null ? now-d30 : null, cr: t!=null&&now!=null ? now-t : null, pr: t ? pct(now,t) : null, posts: pv[k]?.n||0, views: pv[k]?.v||0, url: c.profiles[p]}); });
   table('tAccounts', [
