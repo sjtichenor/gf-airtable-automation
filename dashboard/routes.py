@@ -8,7 +8,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from . import activity, auth, slack
-from .data import cache, client_view, slugify
+from .data import BASE, EP, FAKE as FAKE_DATA, TABLES, TOKEN, API as AIRTABLE_API, cache, client_view, slugify
+from datetime import datetime
+import requests
 
 router = APIRouter(prefix="/dashboard")
 HERE = os.path.dirname(__file__)
@@ -206,6 +208,93 @@ def team_page(request: Request):
     if not auth.is_authed(request):
         return RedirectResponse("/dashboard/login", status_code=303)
     return HTMLResponse(_read("team.html"))
+
+
+@router.get("/mine", response_class=HTMLResponse)
+def mine_page(request: Request):
+    if not auth.is_authed(request):
+        return RedirectResponse("/dashboard/login", status_code=303)
+    return HTMLResponse(_read("mine.html"))
+
+
+@router.get("/api/mine")
+def api_mine(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    snap = cache.snapshot
+    if snap is None:
+        return JSONResponse({"error": "warming up", **cache.status()}, status_code=503, headers={"Retry-After": "5"})
+    people = [{"id": t["id"], "name": t["name"], "photo": t.get("photo"), "roles": t.get("roles") or []}
+              for t in snap.get("team", []) if t.get("active")]
+    people.sort(key=lambda t: t["name"])
+    return JSONResponse({
+        "generated_at": snap.get("generated_at"),
+        "episodes": snap.get("episodes", []),
+        "team": people,
+    }, headers={"Cache-Control": "private, max-age=30"})
+
+
+# What each board action writes. Miner is a link, Claimed At a datetime,
+# Mining Status one of MINING_STATUS. Field ids, so a rename in Airtable
+# cannot break it.
+MINE_ACTIONS = {
+    "claim":   lambda who, now: {EP["miner"]: [who], EP["status"]: "Claimed", EP["claimed"]: now},
+    "start":   lambda who, now: {EP["miner"]: [who], EP["status"]: "Mining"},
+    "release": lambda who, now: {EP["miner"]: [], EP["status"]: "Available", EP["claimed"]: None},
+    "mined":   lambda who, now: {EP["status"]: "Mined"},
+    "skip":    lambda who, now: {EP["status"]: "Skipped"},
+}
+
+
+@router.post("/api/mine/act")
+async def api_mine_act(request: Request):
+    """One episode, one action, written straight to Airtable and mirrored
+    into the snapshot so the board reflects it without waiting for the next
+    refresh. Airtable has no record locking: two people claiming the same
+    episode in the same second both succeed and the last write wins, exactly
+    as in the interface this replaces -- the board re-reads every 30 s."""
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    snap = cache.snapshot
+    if snap is None:
+        return JSONResponse({"error": "warming up"}, status_code=503)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "bad json"}, status_code=400)
+    ep_id, action, who = body.get("episode"), body.get("action"), body.get("who")
+    if action not in MINE_ACTIONS:
+        return JSONResponse({"error": "unknown action"}, status_code=400)
+    episode = next((e for e in snap.get("episodes", []) if e["id"] == ep_id), None)
+    if not episode:
+        return JSONResponse({"error": "unknown episode"}, status_code=404)
+    person = next((t for t in snap.get("team", []) if t["id"] == who), None)
+    if action in ("claim", "start") and not person:
+        return JSONResponse({"error": "pick who you are first"}, status_code=400)
+
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    fields = MINE_ACTIONS[action](who, now)
+    if not FAKE_DATA:
+        r = requests.patch(f"{AIRTABLE_API}/{BASE}/{TABLES['episodes']}/{ep_id}",
+                           headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"},
+                           json={"fields": fields}, timeout=30)
+        if r.status_code != 200:
+            detail = ""
+            try:
+                detail = (r.json().get("error") or {}).get("message") or ""
+            except ValueError:
+                pass
+            return JSONResponse({"error": f"Airtable said {r.status_code}: {detail or r.text[:200]}"}, status_code=502)
+
+    # Mirror the write so the next paint is right.
+    if EP["miner"] in fields:
+        episode["miner_id"] = who if fields[EP["miner"]] else None
+        episode["miner"] = person["name"] if fields[EP["miner"]] and person else None
+    if EP["status"] in fields:
+        episode["status"] = fields[EP["status"]]
+    if EP["claimed"] in fields:
+        episode["claimed"] = fields[EP["claimed"]]
+    return JSONResponse({"ok": True, "episode": episode})
 
 
 @router.get("/api/activity")

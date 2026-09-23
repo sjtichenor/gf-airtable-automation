@@ -9,6 +9,7 @@ do not break anything.
 import logging
 import os
 import random
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -38,6 +39,7 @@ TABLES = {
     "clients": "tblYF8v9O280SU2oB",
     "status_logs": "tblnPcYMXNYwLkpYD",
     "demographics": "tblG4ElwziblQZM9E",
+    "episodes": "tblHBczQjSraq5hWe",
 }
 ACTIVITY_DAYS = int(os.environ.get("DASHBOARD_ACTIVITY_DAYS", "120"))
 
@@ -138,6 +140,34 @@ TE = {
     "start": "fldlq4ZRfCkdkKsF6",     # Start Date
     "bootcamp": "flddA3zwYMTfOhU9z",  # Bootcamp Class
 }
+# Full Episodes, for the mining board. Only what a miner needs to pick an
+# episode and play it; nothing here reaches a client page (client_view builds
+# its own dict and never includes episodes).
+EP = {
+    "title": "fldsKkmKBls8DjWBz",       # Episode Title
+    "air": "fldASlNq1KPv6DlQp",         # Air Date
+    "number": "fldaMFu54hu4MUGrj",      # Episode Number
+    "show": "fldTdRD3q55c2BvNG",        # Show (link)
+    "page": "fldpUJ5JxUCv0MtXW",        # Episode Page
+    "yt": "fldrzQAp2FQlD5wNe",          # YouTube Link
+    "length": "fld4Pl9XjwPnV2l2Q",      # Episode Length (seconds)
+    "clips": "fldD9QN5gARZfGKVS",       # # of Clips (count)
+    "clip_views": "fldpQZrvpsFakqUyU",  # Total Clip Views (rollup)
+    "miner": "fld4DPB0678mdBLiD",       # Miner (link to Team)
+    "status": "fldzKFuWnEoZ5yLgw",      # Mining Status
+    "claimed": "fldLFYgneqraALI1V",     # Claimed At
+    "priority": "fld6rh4X1MyDhfyv0",    # Mining Priority (formula, "1 - Highest" .. "5 - Don't Mine")
+    "mineable": "fldojTMh0P9G89Ox1",    # Mineable? (formula, "Yes"/"No")
+    "description": "fldAcIGEnEZ8z5DxQ", # Episode Description
+    "guest": "fldb0D8nFJJZYZ7yG",       # Guest (detected) (aiText)
+    "art": "fldSGEgzNTZAME4IE",         # Episode Art
+    "art_sq": "fldVVebI3fb19x4fq",      # Episode Art (Square)
+    "notes": "fldlP68wXyCcN0FSJ",       # Mining Notes
+    "target": "fld1YFQOGxTnwDjms",      # Target Clips
+    "created": "fldIti64r0qOuIYqp",     # Date Created
+}
+MINING_STATUS = ("Available", "Claimed", "Mining", "Mined", "Skipped")
+
 CL = {"name": "fldGWgYaByXkGtc3Y",    # Client Account Name
       "logo": "fldnTGv016lmdGlmg"}  # Logo attachment (9 of 34 clients had one, 2026-09-21)
 
@@ -219,7 +249,57 @@ def _thumb(att):
     return None
 
 
+def _thumb_large(att):
+    """Card-sized art: Airtable's 'large' thumbnail (~512px), never the full file."""
+    if isinstance(att, list) and att:
+        t = att[0].get("thumbnails", {}).get("large") or att[0].get("thumbnails", {}).get("small")
+        return (t or att[0]).get("url")
+    return None
+
+
+_YT = re.compile(r"(?:[?&]v=|youtu\.be/|/shorts/|/live/|/embed/)([A-Za-z0-9_-]{11})")
+
+
+def youtube_id(url):
+    m = _YT.search(url or "")
+    return m.group(1) if m else None
+
+
 # ── shaping ──────────────────────────────────────────────────────────────
+
+def shape_episode(f: dict, rid: str, shows: dict, team: dict) -> dict:
+    st = f.get(EP["status"])
+    guest = f.get(EP["guest"])
+    if isinstance(guest, dict):  # aiText: {"state": ..., "value": ...}
+        guest = guest.get("value")
+    show_id = _first(f.get(EP["show"]))
+    return {
+        "id": rid,
+        "title": f.get(EP["title"]) or "",
+        "air": f.get(EP["air"]),
+        "number": f.get(EP["number"]),
+        "show": (shows.get(show_id) or {}).get("name") if show_id else None,
+        "show_id": show_id,
+        "page": f.get(EP["page"]),
+        "yt": f.get(EP["yt"]),
+        "yt_id": youtube_id(f.get(EP["yt"])),
+        "length": f.get(EP["length"]),
+        "clips": f.get(EP["clips"]) or 0,
+        "clip_views": f.get(EP["clip_views"]) or 0,
+        "miner": team.get(_first(f.get(EP["miner"])) or "", None),
+        "miner_id": _first(f.get(EP["miner"])),
+        "status": st.get("name") if isinstance(st, dict) else st,
+        "claimed": f.get(EP["claimed"]),
+        "priority": f.get(EP["priority"]) or "",
+        "mineable": f.get(EP["mineable"]) == "Yes",
+        "description": (f.get(EP["description"]) or "").strip()[:600],
+        "guest": (guest or "").strip(),
+        "art": _thumb_large(f.get(EP["art_sq"]) or f.get(EP["art"])),
+        "notes": f.get(EP["notes"]) or "",
+        "target": f.get(EP["target"]),
+        "created": f.get(EP["created"]),
+    }
+
 
 def build_snapshot() -> dict:
     if FAKE:
@@ -239,6 +319,7 @@ def build_snapshot() -> dict:
         "followers": (TABLES["followers"], _flatten(FL.values()), None),
         "status_logs": (TABLES["status_logs"], _flatten(SL.values()), formula),
         "demographics": (TABLES["demographics"], _flatten(DM.values()), None),
+        "episodes": (TABLES["episodes"], _flatten(EP.values()), None),
     }
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = {name: pool.submit(fetch_table, *args) for name, args in jobs.items()}
@@ -430,8 +511,11 @@ def build_snapshot() -> dict:
             latest[key] = wk
     demographics = [d for d in demo_rows if latest.get((d["channel"], d["platform"])) == d["week"]]
 
+    episodes = [shape_episode(r["fields"], r["id"], shows, team) for r in raw["episodes"]]
+
     return {
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "episodes": episodes,
         "shows": list(shows.values()),
         "channels": list(channels.values()),
         "demographics": demographics,
@@ -445,6 +529,36 @@ def build_snapshot() -> dict:
 
 
 # ── fake data for local layout work (DASHBOARD_FAKE_DATA=1) ──────────────
+
+def fake_episodes(rnd, shows, team_rows):
+    """Enough shape to lay the mining board out: a spread of priorities,
+    a few taken, a few already clipped, half with a YouTube id."""
+    from datetime import date, timedelta
+    prios = ["1 - Highest", "2 - High", "3 - Medium", "4 - Low", "5 - Don't Mine"]
+    guests = ["Sam Altman", "Chamath Palihapitiya", "Bill Gurley", "Anatoly Yakovenko", "", "Kara Swisher", "Dylan Patel", ""]
+    people = [t for t in team_rows if t.get("active")]
+    out = []
+    for n in range(140):
+        sh = shows[n % len(shows)]
+        aired = date(2026, 9, 23) - timedelta(days=int(rnd.expovariate(1 / 25)))
+        taken = rnd.random() < 0.08
+        who = rnd.choice(people) if taken and people else None
+        clips = rnd.choice([0, 0, 0, 0, 3, 7, 12])
+        out.append({
+            "id": f"ep{n}", "title": f"Episode {n}: {rnd.choice(['The bond market is warning us', 'Why nobody trusts the news', 'AI bears are asking the wrong question', 'Tokenized funds could replace ETFs', 'What a Chicago winter does to everybody'])}",
+            "air": aired.isoformat(), "number": 300 - n, "show": sh["name"], "show_id": sh["id"],
+            "page": "https://example.com/episode", "yt": "https://www.youtube.com/watch?v=dQw4w9WgXcQ" if n % 2 else None,
+            "yt_id": "dQw4w9WgXcQ" if n % 2 else None, "length": rnd.randint(1500, 7200),
+            "clips": clips, "clip_views": clips * rnd.randint(2000, 90000),
+            "miner": who["name"] if who else None, "miner_id": who["id"] if who else None,
+            "status": rnd.choice(["Claimed", "Mining"]) if who else None,
+            "claimed": (aired + timedelta(days=1)).isoformat() + "T15:00:00Z" if who else None,
+            "priority": prios[min(4, int(rnd.expovariate(1 / 1.6)))], "mineable": True,
+            "description": "A fake description long enough to wrap onto a couple of lines so the card layout can be judged honestly. " * 2,
+            "guest": rnd.choice(guests), "art": None, "notes": "", "target": rnd.choice([None, 5, 8]), "created": aired.isoformat(),
+        })
+    return out
+
 
 def fake_snapshot() -> dict:
     rnd = random.Random(7)
@@ -550,6 +664,7 @@ def fake_snapshot() -> dict:
             demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "City", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
             "shows": shows, "channels": channels, "demographics": demographics, "team": team_rows, "videos": videos, "status_logs": status_logs,
+            "episodes": fake_episodes(rnd, shows, team_rows),
             "posts": posts, "followers": followers,
             "client_logos": {"flock": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 738 213'%3E%3Crect width='738' height='213' fill='%23111'/%3E%3Ctext x='369' y='140' font-size='120' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%234ade80'%3EFLOCK%3C/text%3E%3C/svg%3E"}}
 

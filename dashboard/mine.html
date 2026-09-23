@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Good Future Media · Mine</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --border:#e5e8ee; --text:#0f172a; --muted:#64748b; --muted2:#94a3b8;
+  --accent:#2563eb; --accent-soft:#dbeafe; --up:#16a34a; --down:#dc2626; --warn:#d97706; --chip:#eef2f7; --chip-on:#0f172a; --chip-on-text:#fff;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12);
+  --p1:#dc2626; --p2:#ea580c; --p3:#2563eb; --p4:#64748b; --p5:#94a3b8;
+}
+html[data-theme=dark]{
+  --bg:#0b0e14; --card:#161c29; --border:#2b3547; --text:#e6e9ef; --muted:#a7b1c2; --muted2:#8a93a3;
+  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --warn:#fbbf24; --chip:#1f2735; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6);
+  --p1:#f87171; --p2:#fb923c; --p3:#5b9dff; --p4:#a7b1c2; --p5:#6b7482;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+button{font:inherit}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.bar{max-width:1440px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em;font-size:16px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed)}
+.brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
+.nav{display:flex;gap:4px}
+.nav a{padding:6px 12px;border-radius:8px;color:var(--muted);font-weight:500}
+.nav a:hover{background:var(--accent-soft);color:var(--accent)}
+.nav a.on{background:var(--accent-soft);color:var(--accent)}
+.spacer{flex:1}
+.meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.ghost{padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);cursor:pointer;font-size:13px}
+.ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+main{max-width:1440px;margin:0 auto;padding:16px 24px 80px}
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.tools select,.tools input[type=search]{padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--text);font:inherit;min-width:150px}
+.tools input[type=search]{flex:1;min-width:220px}
+.who{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+.who label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+.who select{border:0;background:transparent;font-weight:600;padding:4px 6px;min-width:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 18px}
+.chip{padding:5px 11px;border-radius:999px;background:var(--chip);border:1px solid transparent;color:var(--text);cursor:pointer;font-size:12.5px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.chip .sw{width:8px;height:8px;border-radius:50%}
+.chip.on{background:var(--chip-on);color:var(--chip-on-text)}
+.chip.on .sw{outline:2px solid var(--chip-on-text);outline-offset:1px}
+.toggle{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;margin-left:6px}
+.summary{color:var(--muted);font-size:12.5px;margin-left:auto}
+
+section.group{margin-bottom:26px}
+.ghead{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.ghead h2{font-size:15px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px}
+.ghead h2 .sw{width:10px;height:10px;border-radius:50%}
+.ghead .n{color:var(--muted);font-weight:500;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);display:grid;grid-template-columns:84px 1fr;gap:12px;padding:12px;position:relative;transition:border-color .12s}
+.card:hover{border-color:var(--accent)}
+.card.taken{opacity:.72}
+.card.mine{border-color:var(--accent)}
+.art{width:84px;height:84px;border-radius:10px;background:var(--chip);object-fit:cover;display:block;cursor:pointer}
+.art.blank{display:grid;place-items:center;color:var(--muted2);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.card .body{min-width:0;display:flex;flex-direction:column;gap:4px}
+.card .show{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.card .show .age{font-weight:500;text-transform:none;letter-spacing:0}
+.card h3{font-size:14px;font-weight:600;margin:0;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.card h3:hover{color:var(--accent)}
+.card .guest{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.badge.taken{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.badge.mine{background:var(--accent-soft);color:var(--accent)}
+.badge.clipped{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
+.badge.mined{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
+.badge.skipped{background:var(--chip);color:var(--muted2)}
+.acts{display:flex;gap:6px;margin-top:auto;padding-top:6px;flex-wrap:wrap}
+.btn{padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:12.5px;font-weight:500}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.08);color:#fff}
+.btn[disabled]{opacity:.5;cursor:default}
+.empty{color:var(--muted);padding:40px 0;text-align:center}
+.loading{color:var(--muted);padding:60px 0;text-align:center}
+
+/* drawer: player + everything about one episode */
+#drawer{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;justify-content:flex-end;z-index:20}
+#drawer[hidden]{display:none}
+.panel{width:min(760px,100%);height:100%;background:var(--card);border-left:1px solid var(--border);overflow:auto;display:flex;flex-direction:column}
+.panel .top{display:flex;gap:12px;align-items:flex-start;padding:16px 20px;border-bottom:1px solid var(--border)}
+.panel .top h2{font-size:17px;margin:0;line-height:1.3;font-weight:700}
+.panel .top .sub{color:var(--muted);font-size:12.5px;margin-top:4px}
+.player{aspect-ratio:16/9;background:#000;width:100%}
+.player iframe{width:100%;height:100%;border:0;display:block}
+.noplayer{aspect-ratio:16/9;display:grid;place-items:center;background:var(--chip);color:var(--muted);text-align:center;padding:20px}
+.panel .rest{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.desc{font-size:13.5px;color:var(--text);white-space:pre-wrap;max-height:220px;overflow:auto;padding-right:6px}
+.panel .acts{padding-top:0}
+.close{margin-left:auto}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--chip-on);color:var(--chip-on-text);padding:10px 16px;border-radius:10px;font-size:13px;z-index:30;box-shadow:var(--shadow)}
+.toast[hidden]{display:none}
+@media (max-width:640px){.card{grid-template-columns:64px 1fr}.art{width:64px;height:64px}.tools select{min-width:0}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <div class="brand"><span class="dot"></span>Good Future Media<span class="sub">Mine</span></div>
+  <nav class="nav"><a href="/dashboard">Overview</a><a href="/dashboard/team">Team</a><a class="on" href="/dashboard/mine">Mine</a><a href="/dashboard/links">Dashboards</a></nav>
+  <div class="spacer"></div>
+  <div class="meta"><span id="stamp"></span><button class="ghost" id="theme">Dark</button><a class="ghost" href="/dashboard/logout">Sign out</a></div>
+</div></header>
+
+<main>
+  <div class="tools">
+    <div class="who"><label for="who">You are</label><select id="who"><option value="">pick your name</option></select></div>
+    <input type="search" id="q" placeholder="Search title, guest, show, description   ( / )" autocomplete="off">
+    <select id="fShow"><option value="">All shows</option></select>
+    <select id="fAge">
+      <option value="30">Aired in the last 30 days</option>
+      <option value="7">Last 7 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="0">Any date</option>
+    </select>
+  </div>
+  <div class="chips" id="chips">
+    <span class="summary" id="summary"></span>
+  </div>
+  <div id="board"><div class="loading">Loading episodes…</div></div>
+</main>
+
+<div id="drawer" hidden>
+  <div class="panel" role="dialog" aria-modal="true">
+    <div class="top">
+      <div><h2 id="dTitle"></h2><div class="sub" id="dSub"></div></div>
+      <button class="ghost close" id="dClose">Close</button>
+    </div>
+    <div id="dPlayer"></div>
+    <div class="rest">
+      <div class="acts" id="dActs"></div>
+      <dl class="kv" id="dKv"></dl>
+      <div class="desc" id="dDesc"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PRIO = [
+  {k:'1 - Highest', label:'Highest', v:'--p1'},
+  {k:'2 - High',    label:'High',    v:'--p2'},
+  {k:'3 - Medium',  label:'Medium',  v:'--p3'},
+  {k:'4 - Low',     label:'Low',     v:'--p4'},
+  {k:'5 - Don\'t Mine', label:"Don't mine", v:'--p5'},
+  {k:'', label:'Unset', v:'--p4'},
+];
+let DATA = null, EPS = [], TEAM = [], drawerId = null;
+const state = {q:'', show:'', age:'30', prio:new Set(['1 - Highest','2 - High','3 - Medium','4 - Low','']), hideTaken:true, hideClipped:true, who:''};
+try { state.who = localStorage.getItem('gf-miner') || ''; } catch(e){}
+
+// ── theme, shared key with the other pages ──
+(function(){
+  const root=document.documentElement, btn=$('#theme'); let saved=null;
+  try{saved=localStorage.getItem('gf-theme')}catch(e){}
+  if(saved) root.setAttribute('data-theme',saved);
+  const label=()=>btn.textContent=root.getAttribute('data-theme')==='dark'?'Light':'Dark'; label();
+  btn.onclick=()=>{const n=root.getAttribute('data-theme')==='dark'?'light':'dark'; root.setAttribute('data-theme',n); try{localStorage.setItem('gf-theme',n)}catch(e){} label();};
+})();
+
+// ── helpers ──
+const today = new Date(); today.setHours(0,0,0,0);
+function daysAgo(iso){ if(!iso) return null; const d=new Date(iso+'T00:00:00'); return Math.round((today-d)/86400000); }
+function ageLabel(iso){ const n=daysAgo(iso); if(n===null) return 'no date'; if(n<=0) return 'today'; if(n===1) return 'yesterday'; if(n<7) return n+'d ago'; if(n<30) return Math.round(n/7)+'w ago'; return new Date(iso+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}); }
+function dur(sec){ if(!sec) return ''; const h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return h?`${h}h ${m}m`:`${m}m`; }
+const full = n => (n||0).toLocaleString();
+// Taken = someone owns it and has not finished. Inferred from the Miner link
+// because Mining Status was blank on every episode when this was built.
+const isTaken = e => !!e.miner_id && !['Mined','Skipped'].includes(e.status);
+// Yours only while it is still open: a mined or skipped episode is nobody's.
+const isMine = e => !!state.who && e.miner_id === state.who && isTaken(e);
+const isClipped = e => (e.clips||0) > 0 || e.status === 'Mined';
+
+// ── load ──
+async function load(){
+  const r = await fetch('/dashboard/api/mine', {credentials:'same-origin'});
+  if (r.status === 503) { $('#board').innerHTML = '<div class="loading">Warming up — the snapshot is still building. Retrying…</div>'; setTimeout(load, 5000); return; }
+  if (r.status === 401) { location.href = '/dashboard/login'; return; }
+  DATA = await r.json(); EPS = DATA.episodes || []; TEAM = DATA.team || [];
+  $('#stamp').textContent = 'Data as of ' + new Date(DATA.generated_at).toLocaleString();
+  fillWho(); fillShows(); fillChips(); render();
+}
+function fillWho(){
+  const sel = $('#who');
+  sel.innerHTML = '<option value="">pick your name</option>' + TEAM.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
+  sel.value = TEAM.some(t=>t.id===state.who) ? state.who : '';
+  state.who = sel.value;
+  sel.onchange = () => { state.who = sel.value; try{localStorage.setItem('gf-miner', state.who)}catch(e){} render(); };
+}
+function fillShows(){
+  const names = [...new Set(EPS.map(e=>e.show).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  $('#fShow').innerHTML = '<option value="">All shows</option>' + names.map(n=>`<option>${esc(n)}</option>`).join('');
+  $('#fShow').onchange = e => { state.show = e.target.value; render(); };
+  $('#fAge').value = state.age; $('#fAge').onchange = e => { state.age = e.target.value; render(); };
+  $('#q').oninput = e => { state.q = e.target.value.trim().toLowerCase(); render(); };
+}
+function fillChips(){
+  const c = $('#chips'); const summary = $('#summary');
+  c.innerHTML = '';
+  PRIO.forEach(p => {
+    const b = document.createElement('button'); b.className = 'chip' + (state.prio.has(p.k) ? ' on' : '');
+    b.innerHTML = `<span class="sw" style="background:var(${p.v})"></span>${esc(p.label)}`;
+    b.onclick = ev => { if (ev.shiftKey) { state.prio = new Set([p.k]); } else if (state.prio.has(p.k)) state.prio.delete(p.k); else state.prio.add(p.k); fillChips(); render(); };
+    c.appendChild(b);
+  });
+  for (const [key, label] of [['hideTaken','Hide taken'], ['hideClipped','Hide already clipped']]) {
+    const l = document.createElement('label'); l.className = 'toggle';
+    l.innerHTML = `<input type="checkbox" ${state[key]?'checked':''}> ${label}`;
+    l.querySelector('input').onchange = ev => { state[key] = ev.target.checked; render(); };
+    c.appendChild(l);
+  }
+  c.appendChild(summary);
+}
+
+// ── select + render ──
+function select(){
+  const maxAge = parseInt(state.age, 10);
+  return EPS.filter(e => {
+    if (!e.mineable) return false;
+    if (!state.prio.has(e.priority || '')) return false;
+    if (state.show && e.show !== state.show) return false;
+    if (maxAge) { const a = daysAgo(e.air); if (a === null || a > maxAge) return false; }
+    if (state.hideTaken && isTaken(e) && !isMine(e)) return false;
+    if (state.hideClipped && isClipped(e) && !isMine(e)) return false;
+    if (e.status === 'Skipped' && !isMine(e)) return false;
+    if (state.q) { const hay = `${e.title} ${e.guest} ${e.show} ${e.description}`.toLowerCase(); if (!hay.includes(state.q)) return false; }
+    return true;
+  });
+}
+function render(){
+  const rows = select();
+  const groups = new Map(PRIO.map(p => [p.k, []]));
+  rows.forEach(e => groups.get(e.priority || '')?.push(e));
+  const board = $('#board'); board.innerHTML = '';
+  let shown = 0;
+  PRIO.forEach(p => {
+    const list = (groups.get(p.k) || []).sort((a,b) => (b.air||'') < (a.air||'') ? -1 : 1);
+    if (!list.length) return;
+    shown += list.length;
+    const sec = document.createElement('section'); sec.className = 'group';
+    sec.innerHTML = `<div class="ghead"><h2><span class="sw" style="background:var(${p.v})"></span>${esc(p.label)}</h2><span class="n">${list.length}</span></div><div class="grid"></div>`;
+    const grid = sec.querySelector('.grid');
+    list.forEach(e => grid.appendChild(card(e)));
+    board.appendChild(sec);
+  });
+  if (!shown) board.innerHTML = '<div class="empty">Nothing matches. Widen the date range or turn a priority back on.</div>';
+  const mine = EPS.filter(isMine).length;
+  $('#summary').textContent = `${shown} of ${EPS.length} episodes` + (state.who ? ` · ${mine} yours` : '');
+}
+function card(e){
+  const el = document.createElement('div');
+  el.className = 'card' + (isTaken(e) ? (isMine(e) ? ' mine' : ' taken') : '');
+  const art = e.art ? `<img class="art" src="${esc(e.art)}" alt="" loading="lazy">` : `<div class="art blank">${esc((e.show||'?').slice(0,3))}</div>`;
+  const badges = [];
+  if (isMine(e)) badges.push(`<span class="badge mine">Yours · ${esc(e.status||'claimed')}</span>`);
+  else if (isTaken(e)) badges.push(`<span class="badge taken">${esc(e.miner)}${e.claimed ? ' · ' + ageLabel(e.claimed.slice(0,10)) : ''}</span>`);
+  if (e.status === 'Mined') badges.push('<span class="badge mined">Mined</span>');
+  else if (e.clips) badges.push(`<span class="badge clipped">${e.clips} clip${e.clips===1?'':'s'}${e.clip_views ? ' · ' + full(e.clip_views) + ' views' : ''}</span>`);
+  if (e.status === 'Skipped') badges.push('<span class="badge skipped">Skipped</span>');
+  if (e.target) badges.push(`<span class="badge">target ${e.target}</span>`);
+  el.innerHTML = `${art}<div class="body">
+    <div class="show"><span>${esc(e.show||'')}</span><span class="age">${esc(ageLabel(e.air))}${e.length ? ' · ' + dur(e.length) : ''}</span></div>
+    <h3>${esc(e.title)}</h3>
+    ${e.guest ? `<div class="guest">${esc(e.guest)}</div>` : ''}
+    <div class="badges">${badges.join('')}</div>
+    <div class="acts">${actions(e, false)}</div>
+  </div>`;
+  el.querySelector('.art').onclick = () => openDrawer(e.id);
+  el.querySelector('h3').onclick = () => openDrawer(e.id);
+  wireActions(el, e);
+  return el;
+}
+function actions(e, inDrawer){
+  const b = [];
+  if (e.yt_id) b.push(`<button class="btn" data-act="play">▶ Play</button>`);
+  else if (e.page) b.push(`<a class="btn" href="${esc(e.page)}" target="_blank" rel="noopener">Open episode ↗</a>`);
+  if (isMine(e)) {
+    if (e.status !== 'Mining') b.push(`<button class="btn" data-act="start">Start mining</button>`);
+    b.push(`<button class="btn primary" data-act="mined">Mark mined</button>`);
+    b.push(`<button class="btn" data-act="skip">Skip</button>`);
+    b.push(`<button class="btn" data-act="release">Release</button>`);
+  } else if (isTaken(e)) {
+    b.push(`<button class="btn" disabled title="${esc(e.miner)} has this">Taken</button>`);
+  } else {
+    b.push(`<button class="btn primary" data-act="claim" ${state.who ? '' : 'title="Pick your name first"'}>Claim</button>`);
+  }
+  if (inDrawer && e.yt) b.push(`<a class="btn" href="${esc(e.yt)}" target="_blank" rel="noopener">YouTube ↗</a>`);
+  if (inDrawer && e.page && e.yt_id) b.push(`<a class="btn" href="${esc(e.page)}" target="_blank" rel="noopener">Episode page ↗</a>`);
+  return b.join('');
+}
+function wireActions(root, e){
+  root.querySelectorAll('[data-act]').forEach(btn => btn.onclick = ev => {
+    ev.stopPropagation();
+    const act = btn.dataset.act;
+    if (act === 'play') return openDrawer(e.id);
+    doAction(e, act, btn);
+  });
+}
+async function doAction(e, act, btn){
+  if ((act === 'claim' || act === 'start') && !state.who) { toast('Pick your name at the top first.'); $('#who').focus(); return; }
+  btn.disabled = true;
+  try {
+    const r = await fetch('/dashboard/api/mine/act', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify({episode:e.id, action:act, who:state.who})});
+    const body = await r.json();
+    if (!r.ok) { toast(body.error || 'That did not save.'); btn.disabled = false; return; }
+    Object.assign(e, body.episode);
+    toast({claim:'Claimed — it is yours.', start:'Marked as mining.', release:'Released.', mined:'Marked mined. Nice.', skip:'Skipped.'}[act]);
+    render(); if (drawerId === e.id) openDrawer(e.id);
+  } catch (err) { toast('Network error; nothing saved.'); btn.disabled = false; }
+}
+
+// ── drawer ──
+function openDrawer(id){
+  const e = EPS.find(x => x.id === id); if (!e) return;
+  drawerId = id;
+  $('#dTitle').textContent = e.title;
+  $('#dSub').textContent = [e.show, e.number ? '#' + e.number : null, e.air ? new Date(e.air+'T00:00:00').toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : null, e.length ? dur(e.length) : null].filter(Boolean).join(' · ');
+  $('#dPlayer').innerHTML = e.yt_id
+    ? `<div class="player"><iframe src="https://www.youtube.com/embed/${esc(e.yt_id)}?rel=0" title="${esc(e.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
+    : `<div class="noplayer"><div>No YouTube link on this episode.${e.page ? `<br><a href="${esc(e.page)}" target="_blank" rel="noopener">Open the episode page ↗</a>` : ''}</div></div>`;
+  $('#dActs').innerHTML = actions(e, true); wireActions($('#dActs'), e);
+  const kv = [];
+  if (e.guest) kv.push(['Guest', e.guest]);
+  if (isTaken(e)) kv.push(['Miner', `${e.miner}${e.status ? ' · ' + e.status : ''}${e.claimed ? ' · since ' + new Date(e.claimed).toLocaleDateString() : ''}`]);
+  if (e.clips) kv.push(['Clips so far', `${e.clips}${e.clip_views ? ' · ' + full(e.clip_views) + ' views' : ''}`]);
+  if (e.target) kv.push(['Target clips', e.target]);
+  if (e.priority) kv.push(['Priority', e.priority.replace(/^\d - /, '')]);
+  if (e.notes) kv.push(['Notes', e.notes]);
+  $('#dKv').innerHTML = kv.map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  $('#dDesc').textContent = e.description || '';
+  $('#drawer').hidden = false;
+}
+function closeDrawer(){ $('#drawer').hidden = true; $('#dPlayer').innerHTML = ''; drawerId = null; }
+$('#dClose').onclick = closeDrawer;
+$('#drawer').addEventListener('click', ev => { if (ev.target === $('#drawer')) closeDrawer(); });
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') closeDrawer();
+  if (ev.key === '/' && document.activeElement !== $('#q') && $('#drawer').hidden) { ev.preventDefault(); $('#q').focus(); }
+});
+let toastTimer = null;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
+
+load();
+// Re-read every 30 s so a teammate's claim shows up without a reload; the
+// drawer and filters stay where they are.
+setInterval(async () => {
+  try { const r = await fetch('/dashboard/api/mine', {credentials:'same-origin'}); if (!r.ok) return;
+    const d = await r.json(); DATA = d; EPS = d.episodes || []; TEAM = d.team || [];
+    $('#stamp').textContent = 'Data as of ' + new Date(d.generated_at).toLocaleString(); render(); } catch (e) {}
+}, 30000);
+</script>
+</body>
+</html>
