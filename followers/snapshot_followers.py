@@ -179,9 +179,50 @@ def health_check():
                          "independent": (f.get(F_NOTES) or "").strip().startswith("Social Blade")})
     ignore = [x for x in os.environ.get("HEALTH_IGNORE", "").replace(",", ";").split(";") if x.strip()]
     findings = health.audit(channels, logs, today=TODAY, ignore=ignore)
+    fill_from_socialblade(findings)
     print("\n" + health.render(findings))
     if any(f["severity"] == 2 for f in findings) and os.environ.get("HEALTH_ALERT", "1") != "0":
         sys.exit(3)
+
+
+# The Airtable interfaces read the Channels follower fields, and those are
+# written only by the platform syncs -- which cannot reach every account
+# (Good Politics' Instagram has no Facebook Page, so the Meta API never
+# sees it). Social Blade can, and already logs the figure daily. When the
+# two disagree and Social Blade's row is fresh, put its figure into the
+# field so the interface stops showing a frozen number. A reachable account
+# gets overwritten again by the official sync later the same day, which is
+# fine: that figure is better and the gap between them is small. Muted
+# pairs (HEALTH_IGNORE) are left alone entirely -- mute means do not touch.
+# A filled finding drops to "look" severity: the number people see is now
+# right, and the log still records that the official sync is lagging.
+def fill_from_socialblade(findings):
+    if os.environ.get("SB_FILL_CHANNELS", "1") == "0":
+        return
+    field_for = {platform: field for field, platform in PLATFORM_FIELDS.items()}
+    today = date.fromisoformat(TODAY)
+    updates, filled = [], []
+    for f in findings:
+        if f.get("check") != "DIVERGES" or not f.get("sb_date"):
+            continue
+        if (today - date.fromisoformat(f["sb_date"])).days > 1:
+            continue  # stale Social Blade row is no better than a stale field
+        field = field_for.get(f["platform"])
+        if not field:
+            continue
+        updates.append({"id": f["channel_id"], "fields": {field: f["sb_count"]}})
+        filled.append(f)
+    if not updates:
+        return
+    try:
+        write(CHANNELS, "PATCH", updates)
+    except SystemExit as exc:
+        print(f"Social Blade fill failed, fields left as they were: {exc}")
+        return
+    for f in filled:
+        f["severity"] = 1
+        f["detail"] += f" -> Channels filled with {f['sb_count']:,} from Social Blade"
+    print(f"Channels: {len(filled)} follower field(s) filled from Social Blade")
 
 
 if __name__ == "__main__":

@@ -94,9 +94,13 @@ def audit(channels, logs, today=None, stale_days=2, flat_days=3, flat_min=100, d
                 d, n, _ = independent[-1]
                 gap = abs(field - n) / max(n, 1) * 100
                 if gap > diverge_pct and max(field, n) >= flat_min:
-                    findings.append(_f(ch, platform, "DIVERGES",
-                                       f"Channels says {field:,}, Social Blade says {n:,} on {d} "
-                                       f"({gap:.0f}% apart)", 2))
+                    finding = _f(ch, platform, "DIVERGES",
+                                 f"Channels says {field:,}, Social Blade says {n:,} on {d} "
+                                 f"({gap:.0f}% apart)", 2)
+                    # Enough for a caller to put Social Blade's figure into
+                    # the Channels field itself.
+                    finding.update(channel_id=ch["id"], sb_count=n, sb_date=d)
+                    findings.append(finding)
 
     findings.sort(key=lambda x: (-x["severity"], x["channel"], x["platform"]))
     return findings
