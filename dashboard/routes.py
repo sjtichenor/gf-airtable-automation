@@ -70,9 +70,10 @@ def home(request: Request):
 # Built from the live configuration rather than a hand-kept list, so a client
 # added or dropped is reflected here without anyone remembering to edit it.
 def _client_rows(session=None) -> str:
-    from .data import (client_groups, client_matches, client_video_accounts,
+    from .data import (client_also_by_client, client_groups, client_matches, client_video_accounts,
                        no_follower_clients, no_show_clients)
     groups, matches = client_groups(), client_matches()
+    also = client_also_by_client()
     hidden_followers, hidden_shows = no_follower_clients(), no_show_clients()
     by_account = client_video_accounts()
     exec_only = auth.exec_only_clients()
@@ -107,6 +108,8 @@ def _client_rows(session=None) -> str:
             caveats.append("videos are matched by Client Account rather than show name")
         if slug in hidden_shows:
             caveats.append("show attribution is dropped")
+        if slug in also:
+            caveats.append("plus anything tagged " + " or ".join(sorted(n.upper() if len(n) <= 4 else n.title() for n in also[slug])) + " in Client Account, wherever it ran")
         if slug in exec_only:
             caveats.append("exec-only: other team members do not see this page")
         if caveats:

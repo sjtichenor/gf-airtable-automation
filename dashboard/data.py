@@ -797,6 +797,29 @@ def client_video_accounts() -> Dict[str, set]:
     return out
 
 
+def client_also_by_client() -> Dict[str, set]:
+    """Clients whose page should also carry anything tagged to them in the
+    Client Account field, wherever it ran.
+    CLIENT_ALSO_BY_CLIENT = "ffp=FFP;other=Name A|Name B"
+    (slug = Client Account name(s), | separated).
+
+    FFP is defined by its two accounts, but work made for FFP sometimes goes
+    out on our own accounts instead. Those videos carry Client Account =
+    FFP, and their posts inherit it, so both are pulled in on top of the
+    account-based selection. A post from one of our accounts has its
+    channel blanked, the same as on a show-based page: the client sees the
+    clip and its numbers, not which of our accounts it ran on."""
+    out: Dict[str, set] = {}
+    for part in os.environ.get("CLIENT_ALSO_BY_CLIENT", "").split(";"):
+        if "=" not in part:
+            continue
+        slug, rest = part.split("=", 1)
+        names = {n.strip().lower() for n in rest.split("|") if n.strip()}
+        if slug.strip() and names:
+            out[slug.strip().lower()] = names
+    return out
+
+
 def no_follower_clients() -> set:
     """Client slugs whose account followers are not theirs to claim.
     CLIENT_NO_FOLLOWERS = "solana;other" (slugs, separated by ; or ,).
@@ -895,6 +918,18 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
         # every such video.
         pick = lambda v: bool(show_names & {x.strip() for x in (v.get("show") or "").split(",") if x.strip()})
     videos = [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if pick(v)]
+    also = client_also_by_client().get((slug or "").strip().lower())
+    if also and not match:
+        tagged = lambda x: (x.get("client") or "").strip().lower() in also
+        have_v = {v["id"] for v in videos}
+        videos += [{k: v.get(k) for k in vkeep} for v in snap.get("videos", []) if tagged(v) and v["id"] not in have_v]
+        have_p = {p["id"] for p in posts}
+        extra = [{k: p.get(k) for k in keep} for p in snap.get("posts", []) if tagged(p) and p["id"] not in have_p]
+        for p in extra:
+            if p.get("channel") not in channel_ids:
+                p["channel"] = None  # ran on one of ours; not the client's to see
+        posts += extra
+
     # Videos are selected by show name, so the show can only be dropped once
     # that selection has happened.
     hide_shows = (slug or "").strip().lower() in no_show_clients()
