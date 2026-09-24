@@ -1,25 +1,46 @@
-"""Shared-password gate for the dashboard.
+"""Who may see the dashboard, and who they are.
 
-One password (DASHBOARD_PASSWORD) for the team. A correct login sets a
-signed, HttpOnly cookie for 30 days; the signature key is DASHBOARD_SECRET
-or, failing that, a hash of the password, so changing either logs everyone
-out. No user accounts yet — Google sign-in restricted to the domain is the
-next step if the audience grows beyond the team.
+Two kinds of session:
+
+* **Team** -- Google sign-in (GOOGLE_OAUTH_CLIENT_ID / _SECRET), allowed for
+  any address on DASHBOARD_ALLOWED_DOMAIN or any email that matches an
+  Active row in the Team table. The cookie carries the email and name,
+  signed, for 30 days, at path "/" so a team member is also let into every
+  client page. The shared DASHBOARD_PASSWORD still works as a fallback and
+  yields an anonymous team session.
+* **Client** -- one password per slug, no username, own cookie per client,
+  unchanged.
+
+The signing key is DASHBOARD_SECRET or, failing that, a hash of the
+passwords, so changing either logs everyone out.
 """
+import base64
 import hashlib
 import hmac
+import json
 import os
+import secrets
 import threading
 import time
-from typing import Dict
+from typing import Dict, Optional
+from urllib.parse import urlencode
 
+import requests
 from fastapi import Request
 
 PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "")
 COOKIE = "gf_dash"
+STATE_COOKIE = "gf_oauth"
 MAX_AGE = 30 * 24 * 3600
 ON_RENDER = bool(os.environ.get("RENDER"))
 FAKE_DATA = os.environ.get("DASHBOARD_FAKE_DATA") == "1"
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+ALLOWED_DOMAIN = os.environ.get("DASHBOARD_ALLOWED_DOMAIN", "goodfuturemedia.com").lower()
+BASE_URL = os.environ.get("DASHBOARD_BASE_URL", "https://api.goodfuturemedia.com").rstrip("/")
+# Who may act as someone else on the mining board. Everyone else is themselves.
+ADMINS = {e.strip().lower() for e in os.environ.get("DASHBOARD_ADMINS", "spencer@goodfuturemedia.com").split(",") if e.strip()}
 
 _failures: Dict[str, list] = {}
 _lock = threading.Lock()
@@ -37,12 +58,148 @@ def session_token() -> str:
     return hmac.new(_secret().encode(), b"gf-dashboard-session-v1", hashlib.sha256).hexdigest()
 
 
-def is_authed(request: Request) -> bool:
+# ── signed sessions ──────────────────────────────────────────────────────
+# value = base64url(json) "." hmac. The json carries who this is; nothing in
+# it is secret, the signature is what makes it trustworthy.
+
+def _b64(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).decode().rstrip("=")
+
+
+def _unb64(s: str) -> bytes:
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def _sign(body: str) -> str:
+    return hmac.new(_secret().encode(), body.encode(), hashlib.sha256).hexdigest()
+
+
+def make_session(email: Optional[str], name: str, sub: str, max_age: int = MAX_AGE) -> str:
+    body = _b64(json.dumps({"v": 2, "sub": sub, "email": (email or "").lower() or None, "name": name,
+                            "exp": int(time.time()) + max_age}, separators=(",", ":")).encode())
+    return body + "." + _sign(body)
+
+
+def read_session(value: str) -> Optional[dict]:
+    if not value:
+        return None
+    if "." not in value:
+        # The pre-identity cookie: a bare token proving the shared password.
+        if PASSWORD and hmac.compare_digest(value, session_token()):
+            return {"v": 1, "sub": "shared", "email": None, "name": "Team"}
+        return None
+    body, _, sig = value.partition(".")
+    if not hmac.compare_digest(sig, _sign(body)):
+        return None
+    try:
+        data = json.loads(_unb64(body))
+    except (ValueError, TypeError):
+        return None
+    if data.get("exp", 0) < time.time():
+        return None
+    return data
+
+
+FAKE_SESSION = {"v": 2, "sub": "fake", "email": "fake@goodfuturemedia.com", "name": "Fake Person"}
+
+
+def is_authed(request: Request) -> Optional[dict]:
+    """The team session, or None. Truthy when signed in, as callers expect."""
     if FAKE_DATA:
-        return True  # local layout work on synthetic numbers; nothing to protect
-    if not PASSWORD:
-        return False
-    return hmac.compare_digest(request.cookies.get(COOKIE, ""), session_token())
+        return dict(FAKE_SESSION)  # local layout work on synthetic numbers; nothing to protect
+    return read_session(request.cookies.get(COOKIE, ""))
+
+
+def is_admin(session: Optional[dict]) -> bool:
+    if FAKE_DATA:
+        return True
+    return bool(session and (session.get("email") or "").lower() in ADMINS)
+
+
+# ── Google sign-in ───────────────────────────────────────────────────────
+
+def google_configured() -> bool:
+    return bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
+
+def redirect_uri() -> str:
+    return BASE_URL + "/dashboard/auth/google/callback"
+
+
+def start_google(next_path: str):
+    """(url to send the browser to, state cookie value). The state is signed
+    and carries where to land afterwards, so a forged callback cannot log
+    someone in or bounce them somewhere odd."""
+    if not (next_path or "").startswith("/") or next_path.startswith("//"):
+        next_path = "/dashboard"
+    state_body = _b64(json.dumps({"n": secrets.token_urlsafe(16), "next": next_path,
+                                  "exp": int(time.time()) + 600}, separators=(",", ":")).encode())
+    state = state_body + "." + _sign(state_body)
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
+        "client_id": GOOGLE_CLIENT_ID, "redirect_uri": redirect_uri(), "response_type": "code",
+        "scope": "openid email profile", "state": state, "prompt": "select_account",
+        "hd": ALLOWED_DOMAIN,  # a hint to Google's account picker; the real check is allowed_email
+    })
+    return url, state
+
+
+def read_state(cookie_value: str, returned_state: str) -> Optional[dict]:
+    if not cookie_value or not returned_state or not hmac.compare_digest(cookie_value, returned_state):
+        return None
+    body, _, sig = cookie_value.partition(".")
+    if not hmac.compare_digest(sig, _sign(body)):
+        return None
+    try:
+        data = json.loads(_unb64(body))
+    except (ValueError, TypeError):
+        return None
+    return data if data.get("exp", 0) >= time.time() else None
+
+
+def google_userinfo(code: str) -> dict:
+    """Exchange the code, then ask Google who it was. Raises on any failure;
+    the caller turns that into a login-page message."""
+    r = requests.post("https://oauth2.googleapis.com/token", data={
+        "code": code, "client_id": GOOGLE_CLIENT_ID, "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": redirect_uri(), "grant_type": "authorization_code"}, timeout=20)
+    r.raise_for_status()
+    token = r.json().get("access_token")
+    if not token:
+        raise RuntimeError("no access token in Google's reply")
+    u = requests.get("https://openidconnect.googleapis.com/v1/userinfo",
+                     headers={"Authorization": f"Bearer {token}"}, timeout=20)
+    u.raise_for_status()
+    info = u.json()
+    if not info.get("email") or not info.get("email_verified", False):
+        raise RuntimeError("Google did not vouch for that email address")
+    return info
+
+
+def allowed_email(email: str, team_rows) -> Optional[dict]:
+    """The Team row for this email (a dict with at least id and name), or a
+    stand-in for an address on the allowed domain that has no row yet, or
+    None when the address may not come in at all."""
+    email = (email or "").lower()
+    for t in team_rows or []:
+        if t.get("active") and (t.get("email") or "").lower() == email:
+            return t
+    if ALLOWED_DOMAIN and email.endswith("@" + ALLOWED_DOMAIN):
+        return {"id": None, "name": email.split("@")[0].replace(".", " ").title(), "email": email}
+    return None
+
+
+def team_row_for(session: Optional[dict], team_rows) -> Optional[dict]:
+    """Resolved at request time, not at login, so a Team row added after
+    someone first signed in is picked up without a new login."""
+    if not session:
+        return None
+    if FAKE_DATA:
+        active = [t for t in team_rows or [] if t.get("active")]
+        return active[0] if active else None
+    email = (session.get("email") or "").lower()
+    if not email:
+        return None
+    return next((t for t in team_rows or [] if t.get("active") and (t.get("email") or "").lower() == email), None)
 
 
 def check_password(candidate: str) -> bool:
@@ -68,13 +225,23 @@ def record_failure(ip: str) -> None:
         _failures.setdefault(ip, []).append(time.time())
 
 
-def set_cookie(response) -> None:
-    response.set_cookie(COOKIE, session_token(), max_age=MAX_AGE, httponly=True,
-                        secure=ON_RENDER, samesite="lax", path="/dashboard")
+def set_cookie(response, session_value: Optional[str] = None) -> None:
+    """Path "/" so the same cookie also opens the client pages. No value
+    given = the shared-password fallback, an anonymous team session."""
+    value = session_value or make_session(None, "Team", "shared")
+    response.set_cookie(COOKIE, value, max_age=MAX_AGE, httponly=True,
+                        secure=ON_RENDER, samesite="lax", path="/")
+
+
+def set_state_cookie(response, state: str) -> None:
+    response.set_cookie(STATE_COOKIE, state, max_age=600, httponly=True,
+                        secure=ON_RENDER, samesite="lax", path="/dashboard/auth")
 
 
 def clear_cookie(response) -> None:
-    response.delete_cookie(COOKIE, path="/dashboard")
+    response.delete_cookie(COOKIE, path="/")
+    response.delete_cookie(COOKIE, path="/dashboard")  # the pre-identity cookie lived here
+    response.delete_cookie(STATE_COOKIE, path="/dashboard/auth")
 
 
 # ── client dashboards ────────────────────────────────────────────────────

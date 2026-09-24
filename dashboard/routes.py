@@ -2,7 +2,7 @@
 import html
 import os
 import time
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -17,10 +17,18 @@ HERE = os.path.dirname(__file__)
 
 
 def login_page(error: str = "", title: str = "Good Future Media", heading: str = "Good Future Media",
-               blurb: str = "Analytics dashboard. Team password.", action: str = "/dashboard/login") -> str:
+               blurb: str = "Analytics dashboard. Team password.", action: str = "/dashboard/login",
+               google_next: str = "") -> str:
     # str.format would trip on the CSS braces; marker swaps are safer.
+    google = ""
+    if google_next and auth.google_configured():
+        google = (f'<a class="google" href="/dashboard/auth/google?next={html.escape(google_next)}">'
+                  '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.3l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>'
+                  'Sign in with Google</a><div class="or">or use the team password</div>')
+        blurb = "Analytics dashboard."
     return (LOGIN.replace("<!--ERROR-->", error).replace("<!--TITLE-->", html.escape(title))
             .replace("<!--HEADING-->", html.escape(heading)).replace("<!--BLURB-->", html.escape(blurb))
+            .replace("<!--GOOGLE-->", google)
             .replace('action="/dashboard/login"', f'action="{action}"'))
 
 
@@ -41,9 +49,13 @@ h1{font-size:18px;margin:0 0 4px} p{margin:0 0 20px;color:#8b95a5;font-size:14px
 input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:10px;border:1px solid #2c3441;background:#0e1116;color:#fff;font-size:15px}
 button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:10px;background:#4f8cff;color:#fff;font-weight:600;font-size:15px;cursor:pointer}
 .err{color:#ff7b72;font-size:13px;margin:10px 0 0}
+.google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px;border-radius:10px;background:#fff;color:#1f2937;font-weight:600;font-size:15px;text-decoration:none;border:1px solid #2c3441}
+.google:hover{background:#f3f4f6}
+.or{color:#8b95a5;font-size:12px;text-align:center;margin:14px 0 10px}
 </style></head><body><form method="post" action="/dashboard/login">
 <h1><!--HEADING--></h1><p><!--BLURB--></p>
-<input type="password" name="password" placeholder="Password" autofocus autocomplete="current-password">
+<!--GOOGLE-->
+<input type="password" name="password" placeholder="Password" autocomplete="current-password">
 <button type="submit">Sign in</button><!--ERROR--></form></body></html>"""
 
 
@@ -137,12 +149,55 @@ def _page_with_mode(mode: dict) -> str:
     return _read("index.html").replace("<!--MODE-->", "<script>window.GF_MODE=" + json.dumps(mode) + "</script>")
 
 
+def _safe_next(value: str) -> str:
+    return value if (value or "").startswith("/") and not value.startswith("//") else "/dashboard"
+
+
 @router.get("/login", response_class=HTMLResponse)
-def login_form(request: Request):
+def login_form(request: Request, next: str = "/dashboard", denied: str = ""):
     if auth.is_authed(request):
-        return RedirectResponse("/dashboard", status_code=303)
-    err = "" if auth.configured() else "<p class='err'>DASHBOARD_PASSWORD is not set on the server.</p>"
-    return HTMLResponse(login_page(err))
+        return RedirectResponse(_safe_next(next), status_code=303)
+    err = ""
+    if denied:
+        err = f"<p class='err'>{html.escape(denied)}</p>"
+    elif not auth.configured() and not auth.google_configured():
+        err = "<p class='err'>Neither DASHBOARD_PASSWORD nor Google sign-in is set up on the server.</p>"
+    return HTMLResponse(login_page(err, google_next=_safe_next(next)))
+
+
+# ── Google sign-in ──
+@router.get("/auth/google")
+def google_start(next: str = "/dashboard"):
+    if not auth.google_configured():
+        return RedirectResponse("/dashboard/login?denied=Google+sign-in+is+not+configured", status_code=303)
+    url, state = auth.start_google(_safe_next(next))
+    resp = RedirectResponse(url, status_code=303)
+    auth.set_state_cookie(resp, state)
+    return resp
+
+
+@router.get("/auth/google/callback")
+def google_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    def bounce(msg: str):
+        return RedirectResponse("/dashboard/login?" + urlencode({"denied": msg}), status_code=303)
+    if error:
+        return bounce(f"Google said: {error}")
+    st = auth.read_state(request.cookies.get(auth.STATE_COOKIE, ""), state)
+    if not st or not code:
+        return bounce("That sign-in link expired or did not match. Try again.")
+    try:
+        info = auth.google_userinfo(code)
+    except Exception as exc:
+        return bounce(f"Google sign-in failed: {exc}")
+    team_rows = (cache.snapshot or {}).get("team", [])
+    who = auth.allowed_email(info["email"], team_rows)
+    if not who:
+        return bounce(f"{info['email']} is not on the team. Ask Spencer to add you to the Team table.")
+    name = who.get("name") or info.get("name") or info["email"]
+    resp = RedirectResponse(st.get("next") or "/dashboard", status_code=303)
+    auth.set_cookie(resp, auth.make_session(info["email"], name, "google"))
+    resp.delete_cookie(auth.STATE_COOKIE, path="/dashboard/auth")
+    return resp
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -154,11 +209,11 @@ async def login(request: Request):
     candidate = parse_qs(body).get("password", [""])[0]
     if auth.check_password(candidate):
         resp = RedirectResponse("/dashboard", status_code=303)
-        auth.set_cookie(resp)
+        auth.set_cookie(resp)  # the shared password: an anonymous team session
         return resp
     auth.record_failure(ip)
     time.sleep(1)
-    return HTMLResponse(login_page("<p class='err'>That's not it.</p>"), status_code=401)
+    return HTMLResponse(login_page("<p class='err'>That's not it.</p>", google_next="/dashboard"), status_code=401)
 
 
 @router.get("/logout")
@@ -211,6 +266,23 @@ def team_page(request: Request):
     return HTMLResponse(_read("team.html"))
 
 
+def _me(request: Request, snap: dict) -> dict:
+    """Identity for the pages: name, team id if the Team table knows them,
+    and whether they may act as someone else."""
+    session = auth.is_authed(request) or {}
+    row = auth.team_row_for(session, snap.get("team", []))
+    return {"name": (row or {}).get("name") or session.get("name") or "Team",
+            "email": session.get("email"), "team_id": (row or {}).get("id"),
+            "admin": auth.is_admin(session), "anonymous": session.get("sub") == "shared"}
+
+
+@router.get("/api/whoami")
+def api_whoami(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return JSONResponse(_me(request, cache.snapshot or {}))
+
+
 @router.get("/mine", response_class=HTMLResponse)
 def mine_page(request: Request):
     if not auth.is_authed(request):
@@ -232,6 +304,7 @@ def api_mine(request: Request):
         "generated_at": snap.get("generated_at"),
         "episodes": snap.get("episodes", []),
         "team": people,
+        "me": _me(request, snap),
     }, headers={"Cache-Control": "private, max-age=30"})
 
 
@@ -263,15 +336,22 @@ async def api_mine_act(request: Request):
         body = await request.json()
     except Exception:
         return JSONResponse({"error": "bad json"}, status_code=400)
-    ep_id, action, who = body.get("episode"), body.get("action"), body.get("who")
+    ep_id, action = body.get("episode"), body.get("action")
     if action not in MINE_ACTIONS:
         return JSONResponse({"error": "unknown action"}, status_code=400)
     episode = next((e for e in snap.get("episodes", []) if e["id"] == ep_id), None)
     if not episode:
         return JSONResponse({"error": "unknown episode"}, status_code=404)
+    # A signed-in person is themselves. An admin may name someone else. The
+    # shared-password session has no identity, so it may still pick a name.
+    me = _me(request, snap)
+    who = body.get("who") if (me["admin"] or me["anonymous"]) else me["team_id"]
+    who = who or me["team_id"]
     person = next((t for t in snap.get("team", []) if t["id"] == who), None)
     if action in ("claim", "start") and not person:
-        return JSONResponse({"error": "pick who you are first"}, status_code=400)
+        msg = ("pick who you are first" if me["anonymous"]
+               else f"{me['email'] or me['name']} is not in the Team table yet -- add a row with that email")
+        return JSONResponse({"error": msg}, status_code=400)
 
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
     fields = MINE_ACTIONS[action](who, now)
@@ -401,7 +481,7 @@ def client_home(slug: str, request: Request):
     slug = slug.lower()
     if slug not in auth.client_passwords():
         return HTMLResponse("Not found", status_code=404)
-    if not auth.is_client_authed(request, slug):
+    if not (auth.is_client_authed(request, slug) or auth.is_authed(request)):
         return RedirectResponse(f"/clients/{slug}/login", status_code=303)
     show = _client_show(slug) or {"name": slug}
     return HTMLResponse(_page_with_mode({"mode": "client", "slug": slug, "name": show.get("name"), "logo": show.get("logo")}))
@@ -410,7 +490,7 @@ def client_home(slug: str, request: Request):
 @clients.get("/{slug}/login", response_class=HTMLResponse)
 def client_login_form(slug: str, request: Request):
     slug = slug.lower()
-    if auth.is_client_authed(request, slug):
+    if auth.is_client_authed(request, slug) or auth.is_authed(request):
         return RedirectResponse(f"/clients/{slug}", status_code=303)
     return _client_login(slug)
 
@@ -443,7 +523,7 @@ def client_logout(slug: str):
 @clients.get("/{slug}/api/data")
 def client_data(slug: str, request: Request):
     slug = slug.lower()
-    if not auth.is_client_authed(request, slug):
+    if not (auth.is_client_authed(request, slug) or auth.is_authed(request)):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     if cache.snapshot is None:
         return JSONResponse({"error": "warming up"}, status_code=503, headers={"Retry-After": "5"})

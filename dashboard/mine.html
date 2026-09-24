@@ -45,6 +45,7 @@ main{max-width:1440px;margin:0 auto;padding:16px 24px 80px}
 .who{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
 .who label{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
 .who select{border:0;background:transparent;font-weight:600;padding:4px 6px;min-width:0}
+.who .me{font-weight:600;padding:4px 8px 4px 2px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0 18px}
 .chip{padding:5px 11px;border-radius:999px;background:var(--chip);border:1px solid transparent;color:var(--text);cursor:pointer;font-size:12.5px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
 .chip .sw{width:8px;height:8px;border-radius:50%}
@@ -162,7 +163,7 @@ const PRIO = [
   {k:'5 - Don\'t Mine', label:"Don't mine", v:'--p5'},
   {k:'', label:'Unset', v:'--p4'},
 ];
-let DATA = null, EPS = [], TEAM = [], drawerId = null;
+let DATA = null, EPS = [], TEAM = [], ME = null, drawerId = null;
 const state = {q:'', show:'', age:'30', prio:new Set(['1 - Highest','2 - High','3 - Medium','4 - Low','']), hideTaken:true, hideClipped:true, who:''};
 try { state.who = localStorage.getItem('gf-miner') || ''; } catch(e){}
 
@@ -193,16 +194,26 @@ async function load(){
   const r = await fetch('/dashboard/api/mine', {credentials:'same-origin'});
   if (r.status === 503) { $('#board').innerHTML = '<div class="loading">Warming up — the snapshot is still building. Retrying…</div>'; setTimeout(load, 5000); return; }
   if (r.status === 401) { location.href = '/dashboard/login'; return; }
-  DATA = await r.json(); EPS = DATA.episodes || []; TEAM = DATA.team || [];
+  DATA = await r.json(); EPS = DATA.episodes || []; TEAM = DATA.team || []; ME = DATA.me || null;
   $('#stamp').textContent = 'Data as of ' + new Date(DATA.generated_at).toLocaleString();
   fillWho(); fillShows(); fillChips(); render();
 }
+// Signed in with Google: you are you, no picker. An admin gets the picker
+// with themselves preselected, so they can claim on someone's behalf. The
+// shared-password session has no identity and keeps the picker as before.
 function fillWho(){
-  const sel = $('#who');
+  const sel = $('#who'), wrap = sel.closest('.who');
+  const known = ME && ME.team_id, canPick = !ME || ME.admin || ME.anonymous;
+  if (known) { state.who = ME.team_id; try{localStorage.setItem('gf-miner', state.who)}catch(e){} }
+  if (known && !canPick) {
+    wrap.innerHTML = `<label>You are</label><span class="me">${esc(ME.name)}</span>`;
+    return;
+  }
   sel.innerHTML = '<option value="">pick your name</option>' + TEAM.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
   sel.value = TEAM.some(t=>t.id===state.who) ? state.who : '';
   state.who = sel.value;
   sel.onchange = () => { state.who = sel.value; try{localStorage.setItem('gf-miner', state.who)}catch(e){} render(); };
+  if (ME && !known && !ME.anonymous) wrap.title = `${ME.email || ME.name} is not in the Team table yet; pick a name for now`;
 }
 function fillShows(){
   const names = [...new Set(EPS.map(e=>e.show).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
@@ -362,7 +373,7 @@ load();
 // drawer and filters stay where they are.
 setInterval(async () => {
   try { const r = await fetch('/dashboard/api/mine', {credentials:'same-origin'}); if (!r.ok) return;
-    const d = await r.json(); DATA = d; EPS = d.episodes || []; TEAM = d.team || [];
+    const d = await r.json(); DATA = d; EPS = d.episodes || []; TEAM = d.team || []; ME = d.me || ME;
     $('#stamp').textContent = 'Data as of ' + new Date(d.generated_at).toLocaleString(); render(); } catch (e) {}
 }, 30000);
 </script>
