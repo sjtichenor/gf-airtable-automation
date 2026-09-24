@@ -41,6 +41,14 @@ ALLOWED_DOMAIN = os.environ.get("DASHBOARD_ALLOWED_DOMAIN", "goodfuturemedia.com
 BASE_URL = os.environ.get("DASHBOARD_BASE_URL", "https://api.goodfuturemedia.com").rstrip("/")
 # Who may act as someone else on the mining board. Everyone else is themselves.
 ADMINS = {e.strip().lower() for e in os.environ.get("DASHBOARD_ADMINS", "spencer@goodfuturemedia.com").split(",") if e.strip()}
+# Who may see the client pages listed in CLIENT_EXEC_ONLY. Other team
+# members do not see those pages exist; the client's own password still
+# opens them. The role comes from the Team table's Role field ("Exec"), so
+# it is managed in Airtable; DASHBOARD_EXECS (emails) is a fallback for an
+# address with no Team row. Separate from ADMINS: one is about visibility,
+# the other about acting for someone else on the mining board.
+EXECS = {e.strip().lower() for e in os.environ.get("DASHBOARD_EXECS", "").split(",") if e.strip()}
+EXEC_ROLE = os.environ.get("DASHBOARD_EXEC_ROLE", "Exec")
 
 _failures: Dict[str, list] = {}
 _lock = threading.Lock()
@@ -114,6 +122,33 @@ def is_admin(session: Optional[dict]) -> bool:
     if FAKE_DATA:
         return True
     return bool(session and (session.get("email") or "").lower() in ADMINS)
+
+
+def is_exec(session: Optional[dict], team_rows=None) -> bool:
+    if FAKE_DATA:
+        return os.environ.get("FAKE_EXEC", "1") == "1"
+    if not session:
+        return False
+    if (session.get("email") or "").lower() in EXECS:
+        return True
+    row = team_row_for(session, team_rows) if team_rows else None
+    return bool(row and EXEC_ROLE in (row.get("roles") or []))
+
+
+def exec_only_clients() -> set:
+    """Client slugs only execs may open with a team session.
+    CLIENT_EXEC_ONLY = "flock;other" (slugs, ; or , separated)."""
+    raw = os.environ.get("CLIENT_EXEC_ONLY", "")
+    return {x.strip().lower() for x in raw.replace(",", ";").split(";") if x.strip()}
+
+
+def team_may_open(session: Optional[dict], slug: str, team_rows=None) -> bool:
+    """A team session opens every client page except the exec-only ones,
+    which need the exec role. No session at all -> False; the caller then
+    falls back to the client's own password."""
+    if not session:
+        return False
+    return slug not in exec_only_clients() or is_exec(session, team_rows)
 
 
 # ── Google sign-in ───────────────────────────────────────────────────────

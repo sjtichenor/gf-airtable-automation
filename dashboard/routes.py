@@ -69,17 +69,20 @@ def home(request: Request):
 
 # Built from the live configuration rather than a hand-kept list, so a client
 # added or dropped is reflected here without anyone remembering to edit it.
-def _client_rows() -> str:
+def _client_rows(session=None) -> str:
     from .data import (client_groups, client_matches, client_video_accounts,
                        no_follower_clients, no_show_clients)
     groups, matches = client_groups(), client_matches()
     hidden_followers, hidden_shows = no_follower_clients(), no_show_clients()
     by_account = client_video_accounts()
+    exec_only = auth.exec_only_clients()
     snap = cache.snapshot or {}
     channel_names = {c["name"].lower(): c["name"] for c in snap.get("channels", [])}
 
     rows = []
     for slug in sorted(auth.client_passwords()):
+        if slug in exec_only and not auth.is_exec(session, snap.get("team", [])):
+            continue  # not listed for colleagues who cannot open it
         match, group = matches.get(slug), groups.get(slug)
         if match:
             name, kind = match["name"], "by title word"
@@ -104,6 +107,8 @@ def _client_rows() -> str:
             caveats.append("videos are matched by Client Account rather than show name")
         if slug in hidden_shows:
             caveats.append("show attribution is dropped")
+        if slug in exec_only:
+            caveats.append("exec-only: other team members do not see this page")
         if caveats:
             desc += " " + caveats[0][0].upper() + caveats[0][1:] + (
                 ("; " + "; ".join(caveats[1:])) if len(caveats) > 1 else "") + "."
@@ -135,10 +140,13 @@ def _every_minutes() -> str:
 def links(request: Request):
     if not auth.is_authed(request):
         return RedirectResponse("/dashboard/login", status_code=303)
-    n = len(auth.client_passwords())
+    session = auth.is_authed(request)
+    team = (cache.snapshot or {}).get("team", [])
+    visible = [s for s in auth.client_passwords() if s not in auth.exec_only_clients() or auth.is_exec(session, team)]
+    n = len(visible)
     note = f"{n} report{'' if n == 1 else 's'} \u00b7 one password each \u00b7 attribution stripped server-side"
     page = (_read("links.html")
-            .replace("<!--CLIENTS-->", _client_rows())
+            .replace("<!--CLIENTS-->", _client_rows(session))
             .replace("<!--CLIENT_NOTE-->", html.escape(note))
             .replace("<!--REFRESH-->", html.escape(_every_minutes())))
     return HTMLResponse(page)
@@ -273,7 +281,8 @@ def _me(request: Request, snap: dict) -> dict:
     row = auth.team_row_for(session, snap.get("team", []))
     return {"name": (row or {}).get("name") or session.get("name") or "Team",
             "email": session.get("email"), "team_id": (row or {}).get("id"),
-            "admin": auth.is_admin(session), "anonymous": session.get("sub") == "shared"}
+            "admin": auth.is_admin(session), "exec": auth.is_exec(session, snap.get("team", [])),
+            "anonymous": session.get("sub") == "shared"}
 
 
 @router.get("/api/whoami")
@@ -481,7 +490,12 @@ def client_home(slug: str, request: Request):
     slug = slug.lower()
     if slug not in auth.client_passwords():
         return HTMLResponse("Not found", status_code=404)
-    if not (auth.is_client_authed(request, slug) or auth.is_authed(request)):
+    session, team = auth.is_authed(request), (cache.snapshot or {}).get("team", [])
+    if session and not auth.team_may_open(session, slug, team) and not auth.is_client_authed(request, slug):
+        # A signed-in colleague who is not an exec: this page does not exist
+        # for them. Clients themselves never carry a team session.
+        return HTMLResponse("Not found", status_code=404)
+    if not (auth.is_client_authed(request, slug) or auth.team_may_open(session, slug, team)):
         return RedirectResponse(f"/clients/{slug}/login", status_code=303)
     show = _client_show(slug) or {"name": slug}
     return HTMLResponse(_page_with_mode({"mode": "client", "slug": slug, "name": show.get("name"), "logo": show.get("logo")}))
@@ -490,7 +504,10 @@ def client_home(slug: str, request: Request):
 @clients.get("/{slug}/login", response_class=HTMLResponse)
 def client_login_form(slug: str, request: Request):
     slug = slug.lower()
-    if auth.is_client_authed(request, slug) or auth.is_authed(request):
+    session, team = auth.is_authed(request), (cache.snapshot or {}).get("team", [])
+    if session and not auth.team_may_open(session, slug, team):
+        return HTMLResponse("Not found", status_code=404)
+    if auth.is_client_authed(request, slug) or auth.team_may_open(session, slug, team):
         return RedirectResponse(f"/clients/{slug}", status_code=303)
     return _client_login(slug)
 
@@ -523,7 +540,8 @@ def client_logout(slug: str):
 @clients.get("/{slug}/api/data")
 def client_data(slug: str, request: Request):
     slug = slug.lower()
-    if not (auth.is_client_authed(request, slug) or auth.is_authed(request)):
+    if not (auth.is_client_authed(request, slug)
+            or auth.team_may_open(auth.is_authed(request), slug, (cache.snapshot or {}).get("team", []))):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     if cache.snapshot is None:
         return JSONResponse({"error": "warming up"}, status_code=503, headers={"Retry-After": "5"})
