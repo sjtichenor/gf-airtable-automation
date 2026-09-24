@@ -482,7 +482,7 @@ function renderAudience(){
 // carries pipeline fields instead of engagement ones, so it gets its own
 // drawer rather than being squeezed into the post columns.
 function openVideoDrill(title, list){
-  const rows = list.map(v => ({title: v.title || '(untitled)', show: v.show || '', type: v.type || '',
+  const rows = list.map(v => ({title: v.title || '(untitled)', show: v.show || '', episode: v.episode || '', type: v.type || '',
     status: v.status || '', editor: v.editor || '', views: v.views, posts: v.posts,
     created: (v.created || '').slice(0,10), finished: (v.finished || '').slice(0,10)}));
   // A video's views are the total across every post it became, whenever those
@@ -492,10 +492,12 @@ function openVideoDrill(title, list){
   $('#drawerSub').textContent = `${full(rows.length)} video${rows.length===1?'':'s'} created in this range · `
     + `${full(tv)} views across every post they became · click a column to sort`;
   const cols = [{h:'Video', k:'title', t:true, f: r => `<span title="${esc(r.title)}">${esc(r.title)}</span>`}];
-  // Show only when we actually have one: a client whose show attribution was
-  // dropped gets a column of blanks otherwise. Type is internal — telling a
-  // client a vertical clip is a vertical clip says nothing.
-  if (rows.some(r => r.show)) cols.push({h:'Show', k:'show'});
+  // A client wants the episode a clip came from, not the show -- on a
+  // single-show page the show column says the same thing 48 times. The team
+  // keeps both. Either column appears only when some row actually has a
+  // value, so a page of YouTube-sourced clips does not get a column of blanks.
+  if (!CLIENT && rows.some(r => r.show)) cols.push({h:'Show', k:'show'});
+  if (rows.some(r => r.episode)) cols.push({h:'Episode', k:'episode', t:true, f: r => `<span title="${esc(r.episode)}">${esc(r.episode)}</span>`});
   if (!CLIENT) cols.push({h:'Type', k:'type'}, {h:'Status', k:'status'}, {h:'Editor', k:'editor'});
   cols.push({h:'Posts', k:'posts', n:true}, {h:'Views', k:'views', n:true}, {h:'Created', k:'created'});
   if (!CLIENT) cols.push({h:'Finished', k:'finished'});

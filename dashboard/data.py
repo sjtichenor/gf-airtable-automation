@@ -105,6 +105,7 @@ VI = {
     "tier": "fldSdpynhbuP9xGQB",      # Editing Tier Level
     "started": "fldgCet8UIFFyReqz",   # Date Started Editing
     "finished": "fldlyyfQG6JQ6Mp7U",  # Date Finished Editing
+    "episode": "flda34XvSlQaFXapj",   # Full Episode (link)
     "views": "fldBTytz2Zd8oUOKl",     # Views rollup (SUM across its posts)
     "post_count": "fld3JS6ACIpCHGlYf",  # how many posts that video became
 }
@@ -393,6 +394,11 @@ def build_snapshot() -> dict:
             "followers": {p: f.get(fid) for p, fid in CH["followers"].items() if f.get(fid) is not None},
         }
 
+    # Episode titles, so a video can say which episode it was cut from. Many
+    # clips come from a YouTube segment or a client's source file rather than
+    # a logged episode, and those simply have none.
+    episode_title = {r["id"]: (r["fields"].get(EP["title"]) or "") for r in raw["episodes"]}
+
     videos = {}
     for r in raw["videos"]:
         f = r["fields"]
@@ -401,6 +407,7 @@ def build_snapshot() -> dict:
             "id": r["id"],
             "title": f.get(VI["title"]) or "",
             "show": f.get(VI["show"]) or "",
+            "episode": episode_title.get(_first(f.get(VI["episode"])) or "", "") or None,
             "editor": team.get(_first(f.get(VI["editor"])) or "", None),
             "director": team.get(_first(f.get(VI["director"])) or "", None),
             "miner": team.get(_first(f.get(VI["miner"])) or "", None),
@@ -624,6 +631,7 @@ def fake_snapshot() -> dict:
             t = end
         cur = hist[-1][0]
         videos.append({"id": f"v{n}", "title": f"Clip {n}: something someone said", "show": show_names[n % 6], "editor": ed, "director": di,
+                       "episode": (f"Episode {300 - n // 3}: " + rnd.choice(["The bond market is warning us", "Why nobody trusts the news", "AI bears are asking the wrong question"])) if n % 5 else None,
                        "miner": rnd.choice(editors), "client": None, "type": "Clip", "tier": "1 - Basic", "status": cur,
                        "status_since": hist[-1][1].isoformat(timespec="seconds") + "Z", "created": t0.isoformat(timespec="seconds") + "Z",
                        "created_by": rnd.choice(editors), "started": None, "finished": None, "speaker": "",
@@ -906,7 +914,7 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
                  else [f for f in snap.get("followers", []) if f["channel"] in channel_ids])
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
-    vkeep = ("id", "title", "show", "type", "created", "views", "posts")  # no pipeline state leaves the server
+    vkeep = ("id", "title", "show", "episode", "type", "created", "views", "posts")  # no pipeline state leaves the server
     accounts = client_video_accounts().get((slug or "").strip().lower())
     if match:
         pick = lambda v: hit(v.get("title"))
