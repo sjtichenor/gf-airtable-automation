@@ -160,8 +160,10 @@ def list_rows(token):
 def write_rows(token, method, records):
     url = f"https://api.airtable.com/v0/{BASE}/{TABLE}"
     for i in range(0, len(records), 10):
+        # typecast lets a first invoice from a new client add its name as a
+        # Client Account option instead of failing when that field is a select.
         r = requests.request(method, url, headers=airtable(token),
-                             json={"records": records[i:i + 10]}, timeout=60)
+                             json={"records": records[i:i + 10], "typecast": True}, timeout=60)
         if r.status_code != 200:
             raise RuntimeError(f"Airtable {method} failed: {r.status_code} {r.text[:300]}")
         time.sleep(0.25)  # 5 req/s
