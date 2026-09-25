@@ -26,6 +26,11 @@ and the client name are never overwritten once set, so a hand correction
 sticks. Drafts are ignored until finalized; a voided invoice that was never in
 Airtable is not created.
 
+Client Account may be plain text or a link to the Client Accounts table; the
+sync notices which from the rows it reads (a link comes back as a list of
+record ids) and writes names either way - with typecast on, Airtable resolves
+a name to the matching Client Accounts record and creates one if it is new.
+
 Client Account. Stripe's customer name is "Solana Foundation" or a person's
 name; the base uses "Solana", "Trading Places", "FFP". The sync learns the
 mapping from the rows already there (invoice-number prefix -> the Client
@@ -38,6 +43,7 @@ Environment
     AIRTABLE_INVOICES_TOKEN      PAT scoped to the Good Future Invoices base
     AIRTABLE_INVOICES_BASE_ID    default appQTaSN3LkKVBgPe
     AIRTABLE_INVOICES_TABLE_ID   default tblx9X2kSBfNYIDvy
+    AIRTABLE_INVOICES_CLIENTS_TABLE_ID  default tblT6T1af3OzvTwh8 (Client Accounts)
     STRIPE_CLIENT_MAP            optional "PREFIX=Client;PREFIX=Client"
     STRIPE_IGNORE                optional "SPEN-0001;TEST-*" - invoice numbers,
                                  or whole prefixes with -*, never written
@@ -58,6 +64,8 @@ log = logging.getLogger("stripe_sync")
 STRIPE_API = "https://api.stripe.com/v1"
 BASE = os.environ.get("AIRTABLE_INVOICES_BASE_ID", "appQTaSN3LkKVBgPe")
 TABLE = os.environ.get("AIRTABLE_INVOICES_TABLE_ID", "tblx9X2kSBfNYIDvy")
+CLIENTS = os.environ.get("AIRTABLE_INVOICES_CLIENTS_TABLE_ID", "tblT6T1af3OzvTwh8")
+CLIENT_NAME = "fldl5n1XmX9qldwg3"  # Client Accounts primary field
 
 # Invoices table, by field id so a rename in Airtable cannot break this.
 F = {
@@ -141,11 +149,13 @@ def airtable(token):
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
-def list_rows(token):
-    url = f"https://api.airtable.com/v0/{BASE}/{TABLE}"
+def list_rows(token, table=TABLE, fields=None):
+    url = f"https://api.airtable.com/v0/{BASE}/{table}"
     out, offset = [], None
     while True:
         params = {"returnFieldsByFieldId": "true", "pageSize": 100}
+        if fields:
+            params["fields[]"] = fields
         if offset:
             params["offset"] = offset
         r = requests.get(url, headers=airtable(token), params=params, timeout=30)
@@ -155,6 +165,31 @@ def list_rows(token):
         offset = body.get("offset")
         if not offset:
             return out
+
+
+def resolve_client_links(token, rows):
+    """If Client Account is a link field, its values are record ids; swap in
+    the client names so the planner sees text either way. Returns True when
+    the field is a link, so writes can be shaped to match."""
+    if not any(isinstance(r.get("fields", {}).get(F["client"]), list) for r in rows):
+        return False
+    names = {c["id"]: (c.get("fields", {}).get(CLIENT_NAME) or "").strip()
+             for c in list_rows(token, CLIENTS, [CLIENT_NAME])}
+    for r in rows:
+        v = r.get("fields", {}).get(F["client"])
+        if isinstance(v, list):
+            r["fields"][F["client"]] = ", ".join(n for n in (names.get(i, "") for i in v) if n)
+    return True
+
+
+def as_links(records):
+    """Client Account as a one-item list of names; typecast turns each into
+    the Client Accounts record of that name, creating it if need be."""
+    for rec in records:
+        v = rec["fields"].get(F["client"])
+        if isinstance(v, str) and v:
+            rec["fields"][F["client"]] = [v]
+    return records
 
 
 def write_rows(token, method, records):
@@ -279,10 +314,13 @@ def sync(dry_run=False):
     ignore = os.environ.get("STRIPE_IGNORE", "")
     invoices = [s for s in (shape(i, ignore) for i in raw) if s]
     rows = list_rows(token)
+    linked = resolve_client_links(token, rows)
     cmap = learn_client_map(rows, os.environ.get("STRIPE_CLIENT_MAP", ""))
     creates, updates, notes = plan(invoices, rows, cmap)
     for n in notes:
         log.warning("stripe sync: %s", n)
+    if linked:
+        as_links(creates), as_links(updates)
     if not dry_run:
         if creates:
             write_rows(token, "POST", creates)
@@ -293,6 +331,7 @@ def sync(dry_run=False):
         "stripe_invoices": len(invoices),
         "skipped": len(raw) - len(invoices),  # drafts and STRIPE_IGNORE
         "airtable_rows": len(rows),
+        "client_field": "link" if linked else "text",
         "created": [c["fields"][F["name"]] for c in creates],
         "updated": len(updates),
         "notes": notes,
