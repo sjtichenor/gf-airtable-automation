@@ -382,6 +382,8 @@ MINE_ACTIONS = {
     "release": lambda who, now: {EP["miner"]: [], EP["status"]: "Available", EP["claimed"]: None},
     "mined":   lambda who, now: {EP["status"]: "Mined"},
     "skip":    lambda who, now: {EP["status"]: "Skipped"},
+    # Execs hand an episode to someone; same write as a claim, in their name.
+    "assign":  lambda who, now: {EP["miner"]: [who], EP["status"]: "Claimed", EP["claimed"]: now},
 }
 
 
@@ -410,10 +412,13 @@ async def api_mine_act(request: Request):
     # A signed-in person is themselves. An admin may name someone else. The
     # shared-password session has no identity, so it may still pick a name.
     me = _me(request, snap)
-    who = body.get("who") if (me["admin"] or me["anonymous"]) else me["team_id"]
+    if action == "assign" and not (me["admin"] or me["exec"]):
+        return JSONResponse({"error": "only execs can assign episodes"}, status_code=403)
+    may_name = me["admin"] or me["anonymous"] or action == "assign"
+    who = body.get("who") if may_name else me["team_id"]
     who = who or me["team_id"]
     person = next((t for t in snap.get("team", []) if t["id"] == who), None)
-    if action in ("claim", "start") and not person:
+    if action in ("claim", "start", "assign") and not person:
         msg = ("pick who you are first" if me["anonymous"]
                else f"{me['email'] or me['name']} is not in the Team table yet -- add a row with that email")
         return JSONResponse({"error": msg}, status_code=400)

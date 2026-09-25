@@ -73,6 +73,7 @@ SH = {
     "relationship": "fldrtfrwG8XFqtfCr",  # Relationship
     "client": "fldaMsJNvRpddhUIr",        # Client Account
     "logo": "fldZZsHZ4bliqgLmh",          # Podcast Logo
+    "default_miner": "fldE0FjzekRf7Kh2u",  # Default Miner (link to Team) -- who usually mines it
 }
 PO = {
     "url": "fldJBwCXb4Hu8DOGp",       # Link to Post
@@ -281,6 +282,9 @@ def shape_episode(f: dict, rid: str, shows: dict, team: dict) -> dict:
         "number": f.get(EP["number"]),
         "show": (shows.get(show_id) or {}).get("name") if show_id else None,
         "show_id": show_id,
+        "client": (shows.get(show_id) or {}).get("relationship") == "Client",
+        "suggested_id": (shows.get(show_id) or {}).get("default_miner_id"),
+        "suggested": (shows.get(show_id) or {}).get("default_miner"),
         "page": f.get(EP["page"]),
         "yt": f.get(EP["yt"]),
         "yt_id": youtube_id(f.get(EP["yt"])),
@@ -374,6 +378,10 @@ def build_snapshot() -> dict:
             "relationship": rel.get("name") if isinstance(rel, dict) else rel,
             "client": clients.get(_first(f.get(SH["client"])) or "", None),
             "logo": _thumb(f.get(SH["logo"])),
+            # Client shows are assigned, not grabbed: the board keeps them in
+            # their own section and suggests the show's usual miner.
+            "default_miner_id": _first(f.get(SH["default_miner"])),
+            "default_miner": team.get(_first(f.get(SH["default_miner"])) or "", None),
         }
 
     channels = {}
@@ -554,6 +562,9 @@ def fake_episodes(rnd, shows, team_rows):
         out.append({
             "id": f"ep{n}", "title": f"Episode {n}: {rnd.choice(['The bond market is warning us', 'Why nobody trusts the news', 'AI bears are asking the wrong question', 'Tokenized funds could replace ETFs', 'What a Chicago winter does to everybody'])}",
             "air": aired.isoformat(), "number": 300 - n, "show": sh["name"], "show_id": sh["id"],
+            "client": sh.get("relationship") == "Client",
+            "suggested_id": (people[n % len(people)]["id"] if people and sh.get("relationship") == "Client" and n % 3 else None),
+            "suggested": (people[n % len(people)]["name"] if people and sh.get("relationship") == "Client" and n % 3 else None),
             "page": "https://example.com/episode", "yt": "https://www.youtube.com/watch?v=dQw4w9WgXcQ" if n % 2 else None,
             "yt_id": "dQw4w9WgXcQ" if n % 2 else None, "length": rnd.randint(1500, 7200),
             "clips": clips, "clip_views": clips * rnd.randint(2000, 90000),
@@ -570,7 +581,7 @@ def fake_episodes(rnd, shows, team_rows):
 def fake_snapshot() -> dict:
     rnd = random.Random(7)
     show_names = ["All-In", "The Techno Optimist", "Good Politics", "20VC", "Solana", "ThursdAI"]
-    shows = [{"id": f"show{i}", "name": n, "relationship": rnd.choice(["Client", "Owned"]), "client": None, "logo": None}
+    shows = [{"id": f"show{i}", "name": n, "relationship": rnd.choice(["Client", "Owned"]), "client": None, "logo": None, "default_miner_id": None, "default_miner": None}
              for i, n in enumerate(show_names)]
     platforms = ["Instagram", "TikTok", "YouTube", "X", "Facebook", "Threads"]
     channels = []
