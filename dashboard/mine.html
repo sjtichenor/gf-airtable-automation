@@ -90,6 +90,11 @@ html[data-theme=dark] .badge.client{color:#3fc3ae}
 .card:hover .hide-btn{opacity:1}
 .hide-btn:hover{background:var(--chip);border-color:var(--border);color:var(--text)}
 .card.hidden{opacity:.6;border-style:dashed}
+.hide-btn[data-tip]::after{content:attr(data-tip);position:absolute;top:30px;right:0;width:max-content;max-width:230px;padding:7px 10px;border-radius:8px;background:var(--chip-on);color:var(--chip-on-text);font-size:12px;line-height:1.4;text-align:left;white-space:normal;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
+.hide-btn[data-tip]:hover::after,.hide-btn[data-tip]:focus-visible::after{opacity:1}
+.toast{display:flex;align-items:center;gap:12px}
+.toast button{padding:4px 10px;border-radius:7px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.toast button:hover{background:rgba(255,255,255,.12)}
 .acts{display:flex;gap:6px;margin-top:auto;padding-top:6px;flex-wrap:wrap}
 .btn{padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:12.5px;font-weight:500}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -325,8 +330,8 @@ function card(e){
     <div class="badges">${badges.join('')}</div>
     <div class="acts">${actions(e, false)}</div>
   </div>${canAssign() ? (e.hidden
-    ? `<button class="hide-btn" data-act="unhide" title="Hidden from the board. Click to put it back for everyone." aria-label="Unhide">↺</button>`
-    : `<button class="hide-btn" data-act="hide" title="Not worth mining? Hide it from the board for everyone (you can see hidden ones with Show hidden)." aria-label="Hide from board">✕</button>`) : ''}`;
+    ? `<button class="hide-btn" data-act="unhide" data-tip="Hidden from the board. Click to put it back for everyone." aria-label="Unhide">↺</button>`
+    : `<button class="hide-btn" data-act="hide" data-tip="Hide from the board. Not worth mining? This takes it off everyone's board; you can find it again with Show hidden." aria-label="Hide from board">✕</button>`) : ''}`;
   el.querySelector('.art').onclick = () => openDrawer(e.id);
   el.querySelector('h3').onclick = () => openDrawer(e.id);
   wireActions(el, e);
@@ -381,15 +386,16 @@ function openAssign(e, btn){
 }
 async function doAction(e, act, btn, who){
   if ((act === 'claim' || act === 'start') && !state.who) { toast('Pick your name at the top first.'); $('#who').focus(); return; }
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   try {
     const r = await fetch('/dashboard/api/mine/act', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify({episode:e.id, action:act, who: who || state.who})});
     const body = await r.json();
-    if (!r.ok) { toast(body.error || 'That did not save.'); btn.disabled = false; return; }
+    if (!r.ok) { toast(body.error || 'That did not save.'); if (btn) btn.disabled = false; return; }
     Object.assign(e, body.episode);
-    toast(act === 'assign' ? `Assigned to ${e.miner}.` : {claim:'Claimed — it is yours.', start:'Marked as mining.', release:'Released.', mined:'Marked mined. Nice.', skip:'Skipped.', hide:'Hidden from the board. Turn on "Show hidden" to see it.', unhide:'Back on the board.'}[act]);
+    if (act === 'hide') toast('Hidden from the board.', {label: 'Undo', run: () => doAction(e, 'unhide', null)});
+    else toast(act === 'assign' ? `Assigned to ${e.miner}.` : {claim:'Claimed — it is yours.', start:'Marked as mining.', release:'Released.', mined:'Marked mined. Nice.', skip:'Skipped.', unhide:'Back on the board.'}[act]);
     render(); if (drawerId === e.id) openDrawer(e.id);
-  } catch (err) { toast('Network error; nothing saved.'); btn.disabled = false; }
+  } catch (err) { toast('Network error; nothing saved.'); if (btn) btn.disabled = false; }
 }
 
 // ── drawer ──
@@ -422,7 +428,13 @@ document.addEventListener('keydown', ev => {
   if (ev.key === '/' && document.activeElement !== $('#q') && $('#drawer').hidden) { ev.preventDefault(); $('#q').focus(); }
 });
 let toastTimer = null;
-function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
+// An optional action ({label, run}) adds a button and keeps the toast up
+// longer -- Undo after a hide, mostly.
+function toast(msg, action){
+  const t = $('#toast'); t.textContent = msg;
+  if (action) { const b = document.createElement('button'); b.textContent = action.label; b.onclick = () => { t.hidden = true; action.run(); }; t.appendChild(b); }
+  t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, action ? 7000 : 2600);
+}
 
 load();
 // Re-read every 30 s so a teammate's claim shows up without a reload; the
