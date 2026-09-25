@@ -105,6 +105,10 @@ def _warm_dashboard() -> None:
     # Stripe -> Airtable invoices, on a timer, only when its two keys are set.
     from invoicing.stripe_sync import start_background as start_stripe_sync
     start_stripe_sync()
+    # Team / Team Months in the Invoices base, daily, from the dashboard snapshot.
+    from dashboard.data import cache as dashboard_cache
+    from invoicing.team_months import start_background as start_team_months
+    start_team_months(lambda: dashboard_cache.snapshot)
 
 
 def missing_config() -> List[str]:

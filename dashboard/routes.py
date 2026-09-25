@@ -313,6 +313,33 @@ def api_stripe_sync(request: Request, dry: int = 0):
         return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
 
 
+@router.post("/api/team-months/sync")
+def api_team_months_sync(request: Request, dry: int = 0):
+    """Rebuild Team and Team Months in the Invoices base now. Admins only."""
+    session = auth.is_authed(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not auth.is_admin(session):
+        return JSONResponse({"error": "admins only"}, status_code=403)
+    from invoicing import team_months
+    if not team_months.configured():
+        return JSONResponse({"error": "AIRTABLE_INVOICES_TOKEN not set"}, status_code=503)
+    if not cache.snapshot:
+        return JSONResponse({"error": "snapshot not ready"}, status_code=503)
+    try:
+        return JSONResponse(team_months.sync(cache.snapshot, dry_run=bool(dry)))
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
+@router.get("/api/team-months/status")
+def api_team_months_status(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    from invoicing import team_months
+    return JSONResponse({"configured": team_months.configured(), **team_months.last})
+
+
 @router.get("/api/stripe/status")
 def api_stripe_status(request: Request):
     if not auth.is_authed(request):
