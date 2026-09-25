@@ -39,6 +39,8 @@ Environment
     AIRTABLE_INVOICES_BASE_ID    default appQTaSN3LkKVBgPe
     AIRTABLE_INVOICES_TABLE_ID   default tblx9X2kSBfNYIDvy
     STRIPE_CLIENT_MAP            optional "PREFIX=Client;PREFIX=Client"
+    STRIPE_IGNORE                optional "SPEN-0001;TEST-*" - invoice numbers,
+                                 or whole prefixes with -*, never written
     STRIPE_SYNC_SECONDS          timer inside gf-api, default 900; 0 disables
 """
 import logging
@@ -98,9 +100,26 @@ def _day(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat() if ts else None
 
 
-def shape(inv):
+def ignored(number, spec):
+    """STRIPE_IGNORE: exact numbers, or PREFIX-* for a whole customer. The
+    one so far is SPEN-0001, a test invoice Spencer sent himself in 2022."""
+    n = (number or "").strip().upper()
+    for item in (spec or "").replace(",", ";").split(";"):
+        item = item.strip().upper()
+        if not item:
+            continue
+        if item.endswith("-*") and n.startswith(item[:-1]):
+            return True
+        if item == n:
+            return True
+    return False
+
+
+def shape(inv, ignore=""):
     """The handful of fields the table needs, or None for a draft."""
     if inv.get("status") == "draft" or not inv.get("number"):
+        return None
+    if ignored(inv["number"], ignore):
         return None
     t = inv.get("status_transitions") or {}
     return {
@@ -255,7 +274,8 @@ def sync(dry_run=False):
     stripe_key = os.environ["STRIPE_API_KEY"]
     token = os.environ["AIRTABLE_INVOICES_TOKEN"]
     raw = fetch_stripe_invoices(stripe_key)
-    invoices = [s for s in (shape(i) for i in raw) if s]
+    ignore = os.environ.get("STRIPE_IGNORE", "")
+    invoices = [s for s in (shape(i, ignore) for i in raw) if s]
     rows = list_rows(token)
     cmap = learn_client_map(rows, os.environ.get("STRIPE_CLIENT_MAP", ""))
     creates, updates, notes = plan(invoices, rows, cmap)
@@ -269,7 +289,7 @@ def sync(dry_run=False):
     summary = {
         "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "stripe_invoices": len(invoices),
-        "drafts_skipped": len(raw) - len(invoices),
+        "skipped": len(raw) - len(invoices),  # drafts and STRIPE_IGNORE
         "airtable_rows": len(rows),
         "created": [c["fields"][F["name"]] for c in creates],
         "updated": len(updates),
