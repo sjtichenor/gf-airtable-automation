@@ -102,6 +102,9 @@ app.include_router(client_router)
 @app.on_event("startup")
 def _warm_dashboard() -> None:
     start_background()
+    # Stripe -> Airtable invoices, on a timer, only when its two keys are set.
+    from invoicing.stripe_sync import start_background as start_stripe_sync
+    start_stripe_sync()
 
 
 def missing_config() -> List[str]:

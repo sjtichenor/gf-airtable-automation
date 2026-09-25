@@ -295,6 +295,32 @@ def api_whoami(request: Request):
     return JSONResponse(_me(request, cache.snapshot or {}))
 
 
+@router.post("/api/stripe/sync")
+def api_stripe_sync(request: Request, dry: int = 0):
+    """Run the Stripe -> Airtable invoice sync now. Admins only; the timer in
+    invoicing.stripe_sync does the same thing every 15 minutes unattended."""
+    session = auth.is_authed(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not auth.is_admin(session):
+        return JSONResponse({"error": "admins only"}, status_code=403)
+    from invoicing import stripe_sync
+    if not stripe_sync.configured():
+        return JSONResponse({"error": "STRIPE_API_KEY / AIRTABLE_INVOICES_TOKEN not set"}, status_code=503)
+    try:
+        return JSONResponse(stripe_sync.sync(dry_run=bool(dry)))
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
+@router.get("/api/stripe/status")
+def api_stripe_status(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    from invoicing import stripe_sync
+    return JSONResponse({"configured": stripe_sync.configured(), **stripe_sync.last})
+
+
 @router.get("/mine", response_class=HTMLResponse)
 def mine_page(request: Request):
     if not auth.is_authed(request):
