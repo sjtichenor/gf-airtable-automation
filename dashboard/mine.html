@@ -84,8 +84,12 @@ html[data-theme=dark] .badge.client{color:#3fc3ae}
 .badge.suggest{background:var(--chip);color:var(--text)}
 .group.client .ghead h2 .sw{background:#0b7a6e}
 .group.client .ghead .note{color:var(--muted);font-size:12.5px;margin-left:auto}
-.assign{display:inline-flex;gap:6px;align-items:center}
-.assign select{padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12.5px;max-width:180px}
+.assign{display:flex;gap:6px;align-items:center;flex-basis:100%;min-width:0}
+.assign select{flex:1;min-width:0;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12.5px}
+.hide-btn{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;line-height:22px;padding:0;opacity:.55}
+.card:hover .hide-btn{opacity:1}
+.hide-btn:hover{background:var(--chip);border-color:var(--border);color:var(--text)}
+.card.hidden{opacity:.6;border-style:dashed}
 .acts{display:flex;gap:6px;margin-top:auto;padding-top:6px;flex-wrap:wrap}
 .btn{padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:12.5px;font-weight:500}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -302,7 +306,7 @@ function render(){
 }
 function card(e){
   const el = document.createElement('div');
-  el.className = 'card' + (isTaken(e) ? (isMine(e) ? ' mine' : ' taken') : '');
+  el.className = 'card' + (isTaken(e) ? (isMine(e) ? ' mine' : ' taken') : '') + (e.hidden ? ' hidden' : '');
   const art = e.art ? `<img class="art" src="${esc(e.art)}" alt="" loading="lazy">` : `<div class="art blank">${esc((e.show||'?').slice(0,3))}</div>`;
   const badges = [];
   if (isMine(e)) badges.push(`<span class="badge mine">Yours · ${esc(e.status||'claimed')}</span>`);
@@ -320,7 +324,9 @@ function card(e){
     ${e.guest ? `<div class="guest">${esc(e.guest)}</div>` : ''}
     <div class="badges">${badges.join('')}</div>
     <div class="acts">${actions(e, false)}</div>
-  </div>`;
+  </div>${canAssign() ? (e.hidden
+    ? `<button class="hide-btn" data-act="unhide" title="Hidden from the board. Click to put it back for everyone." aria-label="Unhide">↺</button>`
+    : `<button class="hide-btn" data-act="hide" title="Not worth mining? Hide it from the board for everyone (you can see hidden ones with Show hidden)." aria-label="Hide from board">✕</button>`) : ''}`;
   el.querySelector('.art').onclick = () => openDrawer(e.id);
   el.querySelector('h3').onclick = () => openDrawer(e.id);
   wireActions(el, e);
@@ -345,9 +351,6 @@ function actions(e, inDrawer){
   if (canAssign() && e.status !== 'Mined') {
     b.push(`<button class="btn" data-act="assign" title="Hand this episode to someone">${isTaken(e) ? 'Reassign…' : 'Assign…'}</button>`);
     if (isTaken(e) && !isMine(e)) b.push(`<button class="btn" data-act="release" title="Take it off ${esc(e.miner)} and put it back">Unassign</button>`);
-    b.push(e.hidden
-      ? `<button class="btn" data-act="unhide" title="Put it back on the board">Unhide</button>`
-      : `<button class="btn" data-act="hide" title="Not worth mining — take it off the board for everyone">Hide</button>`);
   }
   if (inDrawer && e.yt) b.push(`<a class="btn" href="${esc(e.yt)}" target="_blank" rel="noopener">YouTube ↗</a>`);
   if (inDrawer && e.page && e.yt_id) b.push(`<a class="btn" href="${esc(e.page)}" target="_blank" rel="noopener">Episode page ↗</a>`);
