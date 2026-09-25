@@ -384,7 +384,11 @@ MINE_ACTIONS = {
     "skip":    lambda who, now: {EP["status"]: "Skipped"},
     # Execs hand an episode to someone; same write as a claim, in their name.
     "assign":  lambda who, now: {EP["miner"]: [who], EP["status"]: "Claimed", EP["claimed"]: now},
+    # Execs park an episode that is not worth mining; it leaves the board.
+    "hide":    lambda who, now: {EP["hidden"]: True},
+    "unhide":  lambda who, now: {EP["hidden"]: False},
 }
+EXEC_ACTIONS = ("assign", "hide", "unhide")
 
 
 @router.post("/api/mine/act")
@@ -412,8 +416,8 @@ async def api_mine_act(request: Request):
     # A signed-in person is themselves. An admin may name someone else. The
     # shared-password session has no identity, so it may still pick a name.
     me = _me(request, snap)
-    if action == "assign" and not (me["admin"] or me["exec"]):
-        return JSONResponse({"error": "only execs can assign episodes"}, status_code=403)
+    if action in EXEC_ACTIONS and not (me["admin"] or me["exec"]):
+        return JSONResponse({"error": "only execs can do that"}, status_code=403)
     may_name = me["admin"] or me["anonymous"] or action == "assign"
     who = body.get("who") if may_name else me["team_id"]
     who = who or me["team_id"]
@@ -445,6 +449,8 @@ async def api_mine_act(request: Request):
         episode["status"] = fields[EP["status"]]
     if EP["claimed"] in fields:
         episode["claimed"] = fields[EP["claimed"]]
+    if EP["hidden"] in fields:
+        episode["hidden"] = fields[EP["hidden"]]
     return JSONResponse({"ok": True, "episode": episode})
 
 

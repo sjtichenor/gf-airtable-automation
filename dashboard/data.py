@@ -160,6 +160,7 @@ EP = {
     "claimed": "fldLFYgneqraALI1V",     # Claimed At
     "priority": "fld6rh4X1MyDhfyv0",    # Mining Priority (formula, "1 - Highest" .. "5 - Don't Mine")
     "mineable": "fldojTMh0P9G89Ox1",    # Mineable? (formula, "Yes"/"No")
+    "hidden": "fld1SWYVBIN9ouRFr",      # Hide from Mining Board (checkbox; execs' "not worth it")
     "description": "fldAcIGEnEZ8z5DxQ", # Episode Description
     "guest": "fldb0D8nFJJZYZ7yG",       # Guest (detected) (aiText)
     "art": "fldSGEgzNTZAME4IE",         # Episode Art
@@ -297,6 +298,7 @@ def shape_episode(f: dict, rid: str, shows: dict, team: dict) -> dict:
         "claimed": f.get(EP["claimed"]),
         "priority": f.get(EP["priority"]) or "",
         "mineable": f.get(EP["mineable"]) == "Yes",
+        "hidden": bool(f.get(EP["hidden"])),
         "description": (f.get(EP["description"]) or "").strip()[:600],
         "guest": (guest or "").strip(),
         "art": _thumb_large(f.get(EP["art_sq"]) or f.get(EP["art"])),
@@ -571,7 +573,7 @@ def fake_episodes(rnd, shows, team_rows):
             "miner": who["name"] if who else None, "miner_id": who["id"] if who else None,
             "status": rnd.choice(["Claimed", "Mining"]) if who else None,
             "claimed": (aired + timedelta(days=1)).isoformat() + "T15:00:00Z" if who else None,
-            "priority": prios[min(4, int(rnd.expovariate(1 / 1.6)))], "mineable": True,
+            "priority": prios[min(4, int(rnd.expovariate(1 / 1.6)))], "mineable": True, "hidden": n % 23 == 0,
             "description": "A fake description long enough to wrap onto a couple of lines so the card layout can be judged honestly. " * 2,
             "guest": rnd.choice(guests), "art": None, "notes": "", "target": rnd.choice([None, 5, 8]), "created": aired.isoformat(),
         })

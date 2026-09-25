@@ -171,7 +171,7 @@ const PRIO = [
   {k:'', label:'Unset', v:'--p4'},
 ];
 let DATA = null, EPS = [], TEAM = [], ME = null, drawerId = null;
-const state = {q:'', show:'', age:'30', prio:new Set(['1 - Highest','2 - High','3 - Medium','4 - Low','']), hideTaken:true, hideClipped:true, who:''};
+const state = {q:'', show:'', age:'30', prio:new Set(['1 - Highest','2 - High','3 - Medium','4 - Low','']), hideTaken:true, hideClipped:true, showHidden:false, who:''};
 try { state.who = localStorage.getItem('gf-miner') || ''; } catch(e){}
 
 // ── theme, shared key with the other pages ──
@@ -243,7 +243,9 @@ function fillChips(){
     b.onclick = ev => { if (ev.shiftKey) { state.prio = new Set([p.k]); } else if (state.prio.has(p.k)) state.prio.delete(p.k); else state.prio.add(p.k); fillChips(); render(); };
     c.appendChild(b);
   });
-  for (const [key, label] of [['hideTaken','Hide taken'], ['hideClipped','Hide already clipped']]) {
+  const toggles = [['hideTaken','Hide taken'], ['hideClipped','Hide already clipped']];
+  if (canAssign()) toggles.push(['showHidden','Show hidden']);
+  for (const [key, label] of toggles) {
     const l = document.createElement('label'); l.className = 'toggle';
     l.innerHTML = `<input type="checkbox" ${state[key]?'checked':''}> ${label}`;
     l.querySelector('input').onchange = ev => { state[key] = ev.target.checked; render(); };
@@ -262,6 +264,7 @@ function select(){
     if (maxAge) { const a = daysAgo(e.air); if (a === null || a > maxAge) return false; }
     if (state.hideTaken && isTaken(e) && !isMine(e)) return false;
     if (state.hideClipped && isClipped(e) && !isMine(e)) return false;
+    if (e.hidden && !state.showHidden) return false;
     if (e.status === 'Skipped' && !isMine(e)) return false;
     if (state.q) { const hay = `${e.title} ${e.guest} ${e.show} ${e.description}`.toLowerCase(); if (!hay.includes(state.q)) return false; }
     return true;
@@ -307,6 +310,7 @@ function card(e){
   if (e.status === 'Mined') badges.push('<span class="badge mined">Mined</span>');
   else if (e.clips) badges.push(`<span class="badge clipped">${e.clips} clip${e.clips===1?'':'s'}${e.clip_views ? ' · ' + full(e.clip_views) + ' views' : ''}</span>`);
   if (e.status === 'Skipped') badges.push('<span class="badge skipped">Skipped</span>');
+  if (e.hidden) badges.push('<span class="badge skipped">Hidden</span>');
   if (e.client) badges.push('<span class="badge client">Client</span>');
   if (e.client && e.suggested && !isTaken(e)) badges.push(`<span class="badge suggest">usually ${esc(e.suggested)}</span>`);
   if (e.target) badges.push(`<span class="badge">target ${e.target}</span>`);
@@ -334,11 +338,17 @@ function actions(e, inDrawer){
   } else if (isTaken(e)) {
     b.push(`<button class="btn" disabled title="${esc(e.miner)} has this">Taken</button>`);
   } else if (!canClaim(e)) {
-    b.push(`<button class="btn" disabled title="Client shows are assigned by Spencer or Chris${e.suggested ? '; usually ' + esc(e.suggested) : ''}">Assigned internally</button>`);
+    b.push(`<button class="btn" disabled title="Client shows are assigned by Spencer or Chris${e.suggested ? '; usually ' + esc(e.suggested) : ''}">Ask Spencer or Chris</button>`);
   } else {
     b.push(`<button class="btn primary" data-act="claim" ${state.who ? '' : 'title="Pick your name first"'}>Claim</button>`);
   }
-  if (canAssign() && e.status !== 'Mined') b.push(`<button class="btn" data-act="assign" title="Hand this episode to someone">${isTaken(e) ? 'Reassign…' : 'Assign…'}</button>`);
+  if (canAssign() && e.status !== 'Mined') {
+    b.push(`<button class="btn" data-act="assign" title="Hand this episode to someone">${isTaken(e) ? 'Reassign…' : 'Assign…'}</button>`);
+    if (isTaken(e) && !isMine(e)) b.push(`<button class="btn" data-act="release" title="Take it off ${esc(e.miner)} and put it back">Unassign</button>`);
+    b.push(e.hidden
+      ? `<button class="btn" data-act="unhide" title="Put it back on the board">Unhide</button>`
+      : `<button class="btn" data-act="hide" title="Not worth mining — take it off the board for everyone">Hide</button>`);
+  }
   if (inDrawer && e.yt) b.push(`<a class="btn" href="${esc(e.yt)}" target="_blank" rel="noopener">YouTube ↗</a>`);
   if (inDrawer && e.page && e.yt_id) b.push(`<a class="btn" href="${esc(e.page)}" target="_blank" rel="noopener">Episode page ↗</a>`);
   return b.join('');
@@ -374,7 +384,7 @@ async function doAction(e, act, btn, who){
     const body = await r.json();
     if (!r.ok) { toast(body.error || 'That did not save.'); btn.disabled = false; return; }
     Object.assign(e, body.episode);
-    toast(act === 'assign' ? `Assigned to ${e.miner}.` : {claim:'Claimed — it is yours.', start:'Marked as mining.', release:'Released.', mined:'Marked mined. Nice.', skip:'Skipped.'}[act]);
+    toast(act === 'assign' ? `Assigned to ${e.miner}.` : {claim:'Claimed — it is yours.', start:'Marked as mining.', release:'Released.', mined:'Marked mined. Nice.', skip:'Skipped.', hide:'Hidden from the board. Turn on "Show hidden" to see it.', unhide:'Back on the board.'}[act]);
     render(); if (drawerId === e.id) openDrawer(e.id);
   } catch (err) { toast('Network error; nothing saved.'); btn.disabled = false; }
 }
