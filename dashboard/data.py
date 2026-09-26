@@ -112,6 +112,8 @@ VI = {
     "views": "fldBTytz2Zd8oUOKl",     # Views rollup (SUM across its posts)
     "post_count": "fld3JS6ACIpCHGlYf",  # how many posts that video became
     "source_show": "fldW950uakYMpCGxr",  # Source Show: the podcast/event a clip was cut from (videos/source_show.py)
+    "source_episode": "fld9LeMsRUyqJ9bzL",  # Source Episode
+    "source_url": "fldkAXEuh8TcBFcs0",   # Source URL
 }
 SL = {
     "status": "fld0AbS8C4hW6idfb",    # Status
@@ -440,6 +442,8 @@ def build_snapshot() -> dict:
             # Where a clip with no episode of ours actually came from. "Unknown"
             # is the sync's "asked, nothing there" marker and reads as blank.
             "source_show": (lambda x: x if x and x != "Unknown" else None)((f.get(VI["source_show"]) or "").strip()),
+            "source_episode": (lambda x: x if x and x != "Unknown" else None)((f.get(VI["source_episode"]) or "").strip()),
+            "source_url": f.get(VI["source_url"]) or None,
             "views": f.get(VI["views"]),
             "posts": f.get(VI["post_count"]),
         }
@@ -659,6 +663,7 @@ def fake_snapshot() -> dict:
         cur = hist[-1][0]
         videos.append({"id": f"v{n}", "title": f"Clip {n}: something someone said", "show": show_names[n % 6], "editor": ed, "director": di,
                        "source_show": ["The Peel", "Lightspeed", "PokerNews Podcast", None, "Bloomberg Crypto"][n % 5],
+                       "source_episode": ["Turner Novak with Anatoly Yakovenko", None, "Vibhu Norby, Aug 2026", None, None][n % 5], "source_url": None,
                        "episode": (f"Episode {300 - n // 3}: " + rnd.choice(["The bond market is warning us", "Why nobody trusts the news", "AI bears are asking the wrong question"])) if n % 5 else None,
                        "miner": rnd.choice(editors), "client": None, "type": "Clip", "tier": "1 - Basic", "status": cur,
                        "status_since": hist[-1][1].isoformat(timespec="seconds") + "Z", "created": t0.isoformat(timespec="seconds") + "Z",
@@ -953,7 +958,7 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
                  else [f for f in snap.get("followers", []) if f["channel"] in channel_ids])
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
-    vkeep = ("id", "title", "show", "source_show", "episode", "type", "created", "views", "posts")  # no pipeline state leaves the server
+    vkeep = ("id", "title", "show", "source_show", "source_episode", "source_url", "episode", "type", "created", "views", "posts")  # no pipeline state leaves the server
     accounts = client_video_accounts().get((slug or "").strip().lower())
     if match:
         pick = lambda v: hit(v.get("title"))
@@ -985,7 +990,7 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
             v["show"] = None
     if match:
         for v in videos:
-            v["source_show"] = None
+            v["source_show"] = v["source_episode"] = v["source_url"] = None
     if hide_shows:
         for p in posts:
             p["show"] = None

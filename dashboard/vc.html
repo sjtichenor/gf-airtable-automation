@@ -2,156 +2,117 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Good Future Media · VC podcast rankings</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Good Future Media · VC podcast rankings</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* Carta-style: near-white ground, ink text, hairline rules, one accent, tabular figures, lots of air. */
 :root{
-  --bg:#f5f6f8; --card:#ffffff; --border:#e5e8ee; --text:#0f172a; --muted:#64748b; --muted2:#94a3b8;
-  --accent:#2563eb; --accent-soft:#dbeafe; --up:#16a34a; --down:#dc2626; --warn:#d97706; --chip:#eef2f7; --chip-on:#0f172a; --chip-on-text:#fff;
-  --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12); --grid:#eef1f5; --cell:#e9edf3;
+  --bg:#fbfbfa; --card:#ffffff; --line:#e6e6e3; --line2:#f0f0ee; --ink:#141414; --ink2:#5c5c58; --ink3:#8e8e89;
+  --accent:#0b5cff; --accent-soft:#eaf1ff; --gold:#b98b12; --ours:#0b5cff;
+  --shadow:0 1px 2px rgba(20,20,20,.04);
 }
-/* Kept in step with the same block in index.html. --muted (every 12px label)
-   went from 5.9:1 to 7.9:1 against --card, --muted2 from 3.1:1 to 5.5:1, and
-   --cell lifted so an empty heatmap square still reads against the new card. */
-html[data-theme=dark]{
-  --bg:#0b0e14; --card:#161c29; --border:#2b3547; --text:#e6e9ef; --muted:#a7b1c2; --muted2:#8a93a3;
-  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --warn:#fbbf24; --chip:#1f2735; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#2a3344; --cell:#232c3d;
+:root[data-theme="dark"]{
+  --bg:#111110; --card:#1a1a19; --line:#2b2b29; --line2:#232322; --ink:#f2f2ef; --ink2:#b3b3ad; --ink3:#7d7d78;
+  --accent:#6f9dff; --accent-soft:#1b2740; --gold:#d9b34a; --ours:#6f9dff;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-.bar{max-width:1440px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em;font-size:16px}
-.brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed)}
-.brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
-.nav{display:flex;gap:4px;margin-left:8px}.nav a{padding:6px 10px;border-radius:8px;color:var(--muted);font-weight:500}.nav a.on{background:var(--chip);color:var(--text)}
-.spacer{flex:1}
-.meta{color:var(--muted);font-size:12px;display:flex;gap:14px;align-items:center}
-button.ghost,a.ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
-main{max-width:1440px;margin:0 auto;padding:20px 24px 60px}
-.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
-.filters select,.filters input[type=date]{appearance:none;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font:inherit;font-size:13px;box-shadow:var(--shadow)}
-.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
-h2{font-size:15px;margin:26px 0 10px;font-weight:700}
-.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}
-h2.grp{display:flex;align-items:baseline;gap:10px}h2.grp span{font-weight:400;color:var(--muted);font-size:12px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
-.who{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.avatar{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:14px;object-fit:cover;flex:none}
-.who .n{font-weight:700;font-size:14px}.who .r{font-size:12px;color:var(--muted)}
-.plink{color:inherit}.plink:hover{color:var(--accent)}.plink .avatar{cursor:pointer}
-.badge{margin-left:auto;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--muted)}
-.badge.quiet{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
-.badge.today{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
-.stats{display:flex;gap:18px;margin:8px 0 12px;flex-wrap:wrap}
-.stat .v{font-size:18px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.stat .l{font-size:11px;color:var(--muted)}
-.heat{display:flex;gap:3px;overflow:hidden}
-.heat .col{display:flex;flex-direction:column;gap:3px}
-.heat .c{width:11px;height:11px;border-radius:2px;background:var(--cell);cursor:pointer}
-.heat .c.l1{background:color-mix(in srgb,var(--accent) 30%,var(--cell))}.heat .c.l2{background:color-mix(in srgb,var(--accent) 55%,var(--cell))}.heat .c.l3{background:color-mix(in srgb,var(--accent) 80%,var(--cell))}.heat .c.l4{background:var(--accent)}
-.heat .c.sel{outline:2px solid var(--warn);outline-offset:1px}
-.heat .c.future{opacity:.25}
-.months{display:flex;font-size:10px;color:var(--muted2);margin-bottom:4px;height:12px;position:relative}
-.wip{margin-top:10px;font-size:12px;color:var(--muted)}
-/* Day pop-up: one person, one day. Opened from a heatmap square. */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
-.modal{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:16px;width:min(720px,100%);max-height:min(80vh,720px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}
-.modal .mh{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border)}
-.modal .mh .n{font-weight:600}.modal .mh .d{font-size:12px;color:var(--muted)}
-.modal .mh .nav{margin-left:auto;display:flex;gap:6px}
-.modal .mh button{background:var(--cell);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 10px;cursor:pointer;font-size:13px}
-.modal .mh button:disabled{opacity:.4;cursor:default}
-.modal .mb{padding:12px 18px;overflow:auto}
-.modal .mb .sum{font-size:12px;color:var(--muted);margin-bottom:8px}
-.health{border:1px solid color-mix(in srgb,var(--down) 35%,var(--border));background:color-mix(in srgb,var(--down) 6%,var(--card));border-radius:14px;padding:12px 16px;margin-bottom:18px;font-size:13px}
-.health h3{margin:0 0 6px;font-size:13px;color:var(--down)}
-.health ul{margin:0;padding-left:18px}
-.health .look{color:var(--muted);font-size:12px;margin-top:6px}
-.health.ok{border-color:color-mix(in srgb,var(--up) 35%,var(--border));background:color-mix(in srgb,var(--up) 6%,var(--card))}
-.health.ok h3{color:var(--up)}
-.wip b{color:var(--text);font-weight:600}
-.ev{display:grid;grid-template-columns:52px 130px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:baseline}
-.ev .t{color:var(--muted);font-variant-numeric:tabular-nums}
-.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--chip);color:var(--text)}
-.pill.finished,.pill.approved,.pill.posted{background:color-mix(in srgb,var(--up) 18%,transparent);color:var(--up)}
-.pill.sent_back,.pill.dropped{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
-.pill.started,.pill.picked_up,.pill.revision_started,.pill.created{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
-.ev .d{color:var(--muted);font-size:12px}
-.ev .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-.span12{grid-column:span 12}.span6{grid-column:span 6}.span4{grid-column:span 4}
-@media(max-width:1000px){.span6,.span4{grid-column:span 12}}
-.pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.pipe .k{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
-.pipe .k .v{font-size:22px;font-weight:800}.pipe .k .l{font-size:12px;color:var(--muted)}.pipe .k .s{font-size:11px;color:var(--down);margin-top:2px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-.empty{color:var(--muted);padding:24px;text-align:center}
-#overlay{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:20;font-size:15px;color:var(--muted);text-align:center;padding:20px}
-#overlay b{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
-.person-h{font-weight:700;margin:14px 0 4px;display:flex;gap:10px;align-items:baseline}.person-h span{font-weight:400;color:var(--muted);font-size:12px}
-.digest{white-space:pre-wrap;font-size:13px;line-height:1.5}
-
-.lead{color:var(--muted);font-size:13px;margin:6px 0 16px}
-.wrap{overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:14px}
-table.rank{border-collapse:collapse;width:100%;font-size:13px}
-table.rank th,table.rank td{padding:9px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
-table.rank th{position:sticky;top:0;background:var(--card);text-align:left;font-weight:600;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer}
-table.rank th.n,table.rank td.n{text-align:right;font-variant-numeric:tabular-nums}
-table.rank tr.ours td{background:color-mix(in srgb,var(--accent) 9%,transparent)}
-table.rank td.show{font-weight:600}
-table.rank td.show small{display:block;font-weight:400;color:var(--muted);font-size:11px}
-.pos{display:inline-block;min-width:22px;text-align:center;border-radius:6px;background:var(--cell);color:var(--muted);font-size:11px;padding:1px 4px;margin-right:6px}
-.pos.top{background:color-mix(in srgb,var(--up) 18%,transparent);color:var(--up)}
-.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--border);color:var(--muted);margin-left:6px;vertical-align:middle}
-.tag.ours{border-color:color-mix(in srgb,var(--accent) 50%,var(--border));color:var(--accent)}
-.foot{font-size:12px;color:var(--muted);margin-top:12px}
+html{color-scheme:light dark}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1,"cv11" 1}
+a{color:inherit;text-decoration:none}
+header{border-bottom:1px solid var(--line);background:var(--bg)}
+.bar{max-width:1240px;margin:0 auto;padding:0 32px;height:56px;display:flex;align-items:center;gap:28px}
+.brand{font-weight:600;letter-spacing:-.01em;font-size:15px;display:flex;align-items:center;gap:10px}
+.brand i{width:8px;height:8px;border-radius:2px;background:var(--ink);display:inline-block}
+.nav{display:flex;gap:22px;margin-left:8px}
+.nav a{color:var(--ink2);font-weight:500;font-size:13px;padding:18px 0;border-bottom:2px solid transparent}
+.nav a.on{color:var(--ink);border-bottom-color:var(--ink)}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink3)}
+.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit;font-size:12px}
+main{max-width:1240px;margin:0 auto;padding:40px 32px 64px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+h1{margin:6px 0 4px;font-size:30px;font-weight:600;letter-spacing:-.02em}
+.lead{color:var(--ink2);font-size:14px;max-width:720px;margin:0 0 28px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:32px}
+.kpi{background:var(--card);padding:18px 20px}
+.kpi .l{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.kpi .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:6px}
+.kpi .s{font-size:12px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+.card .hd{display:flex;align-items:baseline;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.card .hd h2{margin:0;font-size:15px;font-weight:600}
+.card .hd span{font-size:12px;color:var(--ink3)}
+.wrap{overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:12px 20px;border-bottom:1px solid var(--line2);white-space:nowrap;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);cursor:pointer;user-select:none;background:var(--card);position:sticky;top:0}
+th:hover{color:var(--ink)}
+th.n,td.n{text-align:right}
+td.rank{width:56px;color:var(--ink3);font-weight:500}
+td.show{font-weight:600}
+td.show small{display:block;font-weight:400;color:var(--ink3);font-size:11px;margin-top:2px}
+td .r{display:inline-block;min-width:26px;color:var(--ink3);font-size:11px;margin-right:8px;text-align:right}
+td .r.top{color:var(--gold);font-weight:600}
+td .bar{display:inline-block;height:4px;border-radius:2px;background:var(--line);vertical-align:middle;margin-left:10px;width:72px;position:relative;overflow:hidden}
+td .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ink);opacity:.55}
+tr.ours td{background:var(--accent-soft)}
+tr.ours td.show{box-shadow:inset 3px 0 0 var(--ours)}
+.pill{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--ink2);margin-left:8px;vertical-align:middle}
+tr.ours .pill{border-color:var(--ours);color:var(--ours)}
+.dash{color:var(--ink3)}
+.foot{font-size:12px;color:var(--ink3);margin-top:16px;line-height:1.6}
+.empty{padding:40px;text-align:center;color:var(--ink3)}
+@media (max-width:720px){.bar{padding:0 16px}main{padding:24px 16px 48px}h1{font-size:24px}}
 </style>
 </head>
 <body>
 <header><div class="bar">
-  <div class="brand"><span class="dot"></span>Good Future Media<span class="sub">Analytics</span></div>
+  <a class="brand" href="/dashboard"><i></i>Good Future Media</a>
   <nav class="nav"><a href="/dashboard">Overview</a><a href="/dashboard/team">Team</a><a href="/dashboard/mine">Mine</a><a class="on" href="/dashboard/vc">VC Pods</a><a href="/dashboard/links">Dashboards</a></nav>
-  <div class="meta"><span id="meta"></span><button class="ghost" id="theme">Dark</button><a class="ghost" href="/dashboard/logout">Sign out</a></div>
+  <div class="right"><span id="meta"></span><button class="ghost" id="theme">Dark</button><a class="ghost" href="/dashboard/logout">Sign out</a></div>
 </div></header>
 <main>
-  <h1 style="margin:18px 0 0;font-size:20px">VC podcast rankings</h1>
-  <div class="lead">Every show tagged Venture Capital, ranked by the following of its official accounts. Click a column to sort. Our shows are highlighted.</div>
-  <div class="wrap"><table class="rank" id="t"></table></div>
+  <div class="eyebrow">Benchmark</div>
+  <h1>VC podcast rankings</h1>
+  <p class="lead">Every show tagged Venture Capital, ranked by the following of its official accounts. Ranks are per platform; the total sums the platforms we track for that show.</p>
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><div class="hd"><h2>Leaderboard</h2><span id="sub">Click a column to sort</span></div><div class="wrap"><table id="t"></table></div></div>
   <div class="foot" id="foot"></div>
 </main>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => n == null ? '—' : n.toLocaleString();
+const fmt = n => n == null ? '' : n.toLocaleString();
+const short = n => n >= 1e6 ? (n/1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n/1e3) + 'K' : String(n);
 const root = document.documentElement, KEY = 'gf-theme';
 const applyTheme = t => { root.setAttribute('data-theme', t); $('#theme').textContent = t === 'dark' ? 'Light' : 'Dark'; };
 applyTheme(localStorage.getItem(KEY) || 'light');
 $('#theme').onclick = () => { const t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; localStorage.setItem(KEY, t); applyTheme(t); };
 let D = null, sort = {k:'total', d:-1};
-function val(r, k){ return k === 'total' ? r.total : k === 'name' ? r.name.toLowerCase() : (r.counts[k] ?? -1); }
+const val = (r, k) => k === 'total' ? r.total : k === 'name' ? r.name.toLowerCase() : (r.counts[k] ?? -1);
 function render(){
   const rows = [...D.rows].sort((a,b) => { const x = val(a, sort.k), y = val(b, sort.k); return (x > y ? 1 : x < y ? -1 : 0) * sort.d; });
-  const cols = ['name', ...D.platforms, 'total'];
-  const head = cols.map(k => `<th class="${k==='name'?'':'n'}" data-k="${k}">${k==='name'?'Show':k==='total'?'Total':k}${sort.k===k?(sort.d<0?' ↓':' ↑'):''}</th>`).join('');
-  const body = rows.map(r => `<tr class="${r.ours?'ours':''}"><td class="show"><span class="pos ${r.rank.total<=3?'top':''}">#${r.rank.total}</span>${esc(r.name)}${r.ours?`<span class="tag ours">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
-    + D.platforms.map(p => r.counts[p] == null ? '<td class="n" style="color:var(--muted2)">—</td>' : `<td class="n"><span class="pos ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${fmt(r.counts[p])}</td>`).join('')
-    + `<td class="n"><b>${fmt(r.total)}</b></td></tr>`).join('');
-  $('#t').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
-  $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; sort = {k, d: sort.k===k ? -sort.d : (k==='name'?1:-1)}; render(); });
-  const ours = D.rows.filter(r => r.ours).map(r => `${esc(r.name)} is #${r.rank.total} of ${D.ranked.total} overall` + D.platforms.filter(p=>r.rank[p]).map(p=>`, #${r.rank[p]} on ${p}`).join(''));
-  $('#foot').innerHTML = (ours.length ? ours.join('. ') + '. ' : '') + `Counts come from the Channels follower fields (X and YouTube refresh daily; other platforms as their syncs allow). Data as of ${esc((D.generated_at||'').replace('T',' ').slice(0,16))} UTC.`;
-  $('#meta').textContent = `${D.rows.length} shows ranked`;
+  const max = {}; D.platforms.forEach(p => max[p] = Math.max(...D.rows.map(r => r.counts[p] || 0)));
+  const cols = [['rank','#'], ['name','Show'], ...D.platforms.map(p => [p, p]), ['total','Total']];
+  $('#t').innerHTML = '<thead><tr>' + cols.map(([k,l]) => `<th class="${k==='name'||k==='rank'?'':'n'}" data-k="${k}">${l}${sort.k===k?(sort.d<0?' ↓':' ↑'):''}</th>`).join('') + '</tr></thead><tbody>'
+    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}"><td class="rank">${i+1}</td><td class="show">${esc(r.name)}${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
+      + D.platforms.map(p => r.counts[p] == null ? '<td class="n dash">—</td>' : `<td class="n"><span class="r ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${fmt(r.counts[p])}<span class="bar"><i style="width:${Math.max(2, 100*r.counts[p]/(max[p]||1)).toFixed(0)}%"></i></span></td>`).join('')
+      + `<td class="n"><b>${fmt(r.total)}</b></td></tr>`).join('') + '</tbody>';
+  $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (k === 'rank') return; sort = {k, d: sort.k===k ? -sort.d : (k==='name'?1:-1)}; render(); });
+  const ours = D.rows.filter(r => r.ours);
+  const leader = D.rows[0];
+  $('#kpis').innerHTML = [
+    ['Shows ranked', D.rows.length, `${D.platforms.length} platforms tracked`],
+    ...(leader ? [['Leader', esc(leader.name), `${short(leader.total)} combined`]] : []),
+    ...ours.map(r => [esc(r.name), `#${r.rank.total} of ${D.ranked.total}`, D.platforms.filter(p=>r.rank[p]).map(p=>`#${r.rank[p]} ${p}`).join(' · ')]),
+  ].map(([l,v,s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  $('#foot').textContent = `Counts are the Channels follower fields: X and YouTube refresh daily, other platforms as their syncs allow. Firm-run shows (YC, Sequoia, First Round, Lightspeed, Bessemer, Greylock, Village Global) are ranked on the firm's accounts. Data as of ${(D.generated_at||'').replace('T',' ').slice(0,16)} UTC.`;
+  $('#meta').textContent = `${D.rows.length} shows`;
 }
-fetch('/dashboard/api/vc', {credentials:'same-origin'}).then(r => r.json()).then(d => { D = d; render(); }).catch(() => { $('#t').innerHTML = '<tr><td class="empty">Could not load.</td></tr>'; });
+fetch('/dashboard/api/vc', {credentials:'same-origin'}).then(r => r.json()).then(d => { D = d; if (!d.rows) throw 0; render(); }).catch(() => { $('#t').innerHTML = '<tr><td class="empty">Nothing to rank yet — counts arrive after the next follower sync.</td></tr>'; });
 })();
 </script>
 </body>

@@ -99,10 +99,10 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .panel h2{margin:0 0 10px;font-size:14px}
 .panel h2 span{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
 .bars{display:flex;align-items:flex-end;gap:4px;height:120px;overflow-x:auto;padding-bottom:18px;position:relative}
-.bar{flex:1 0 14px;min-width:14px;background:var(--accent);border-radius:3px 3px 0 0;position:relative;opacity:.9}
-.bar:hover{opacity:1}
-.bar .n{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);white-space:nowrap}
-.bar .m{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--muted2);white-space:nowrap}
+.mbar{flex:1 0 14px;min-width:14px;background:var(--accent);border-radius:3px 3px 0 0;position:relative;opacity:.9}
+.mbar:hover{opacity:1}
+.mbar .n{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);white-space:nowrap}
+.mbar .m{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--muted2);white-space:nowrap}
 .tl{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--border)}
 .tl li{position:relative;padding:0 0 12px 14px;font-size:13px}
 .tl li::before{content:"";position:absolute;left:-19px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
@@ -161,7 +161,7 @@ function render(P){
     ['Posts from their clips', fmt(T.posts)], ['Shows', fmt(T.shows)], ['Directed', fmt(T.directed)], ['Mined', fmt(T.mined)], ['Posted', fmt(T.posted)],
   ].filter(([l,v]) => !(v==='0' && ['Directed','Mined','Posted'].includes(l)));
   const maxF = Math.max(1, ...P.months.map(m=>m.finished));
-  const bars = P.months.length ? `<div class="bars">${P.months.map(m=>`<div class="bar" style="height:${Math.max(4, m.finished/maxF*100)}%" title="${mon(m.month)}: ${m.finished} clips, ${fmt(m.views)} views"><span class="n">${m.finished}</span><span class="m">${mon(m.month)}</span></div>`).join('')}</div>` : '<div class="empty">No finished clips yet.</div>';
+  const bars = P.months.length ? `<div class="bars">${P.months.map(m=>`<div class="mbar" style="height:${Math.max(4, m.finished/maxF*100)}%" title="${mon(m.month)}: ${m.finished} clips, ${fmt(m.views)} views"><span class="n">${m.finished}</span><span class="m">${mon(m.month)}</span></div>`).join('')}</div>` : '<div class="empty">No finished clips yet.</div>';
   const tl = P.milestones.length ? `<ul class="tl">${P.milestones.slice().reverse().map(m=>`<li class="${m.kind}"><div class="d">${nice(m.date)}</div><div>${esc(m.label)}${m.views?` · ${fmt(m.views)} views`:''}</div>${m.title?`<div class="t">${esc(m.title)}</div>`:''}</li>`).join('')}</ul>` : '<div class="empty">Nothing yet.</div>';
   const rows = (list, withPosts) => list.length ? `<table><thead><tr><th>Clip</th><th>Show</th><th class="n">Views</th>${withPosts?'<th class="n">Posts</th>':''}<th class="n">Finished</th></tr></thead><tbody>` +
     list.map(v=>`<tr><td>${esc(v.title||'')}</td><td>${esc(v.show||'')}</td><td class="n">${fmt(v.views)}</td>${withPosts?`<td class="n">${fmt(v.posts)}</td>`:''}<td class="n">${v.finished?nice(v.finished):'—'}</td></tr>`).join('') + '</tbody></table>' : '<div class="empty">None.</div>';

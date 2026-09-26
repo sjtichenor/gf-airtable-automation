@@ -9,7 +9,7 @@ Anatoly Yakovenko - ..."), the tweet copy ("-- @toly on @ThePeelPod"), the
 hashtags (#peelpod), the copywriter's working notes ("The podcast is the
 PokerNews Podcast"), the SOURCE line in the notes. This module hands that
 evidence to Claude, one small batch at a time, and writes the answer into
-the Videos "Source Show" text field.
+the Videos "Source Show", "Source Episode" and "Source URL" fields.
 
 It only ever fills blanks: a value typed by hand stays. When nothing in the
 evidence names a show the field is set to "Unknown" so the video is not
@@ -47,6 +47,8 @@ F = {
     "client": "fldSqPARmtwxe9m15",    # Client Account (link)
     "episode": "flda34XvSlQaFXapj",   # Full Episode (link)
     "source": "fldW950uakYMpCGxr",    # Source Show (text, ours)
+    "episode": "fld9LeMsRUyqJ9bzL",   # Source Episode (text, ours)
+    "url": "fldkAXEuh8TcBFcs0",       # Source URL (ours)
     "yt_title": "fldK1spMcwCSb8srL",  # YouTube Title
     "tweet": "fldy3EkUij952pIt4",     # Tweet
     "yt_desc": "fldbteQua126m01Zz",   # YouTube Description ("-- @toly ... on @ThePeelPod")
@@ -101,9 +103,12 @@ def list_candidates(token, retry_unknown=False):
     ids = client_ids(token)
     if not ids:
         return []
-    blank = 'OR({Source Show} = "", {Source Show} = "Unknown")' if retry_unknown else '{Source Show} = ""'
+    # New rows have no Source Show; rows labelled before the episode fields
+    # existed have a show but no Source Episode yet. Either way they are asked.
+    blank = ('OR({Source Show} = "", {Source Show} = "Unknown", AND({Source Show} != "Unknown", {Source Episode} = ""))'
+             if retry_unknown else 'OR({Source Show} = "", AND({Source Show} != "Unknown", {Source Episode} = ""))')
     recs = _get(token, {"filterByFormula": f'AND({blank}, {{Client Account}} != "", {{Full Episode}} = "")',
-                        "fields[]": [F["title"], F["client"], F["yt_title"], F["tweet"], F["yt_desc"], F["tt_desc"], F["hashtags"], F["notes"], F["ai_notes"]]})
+                        "fields[]": [F["title"], F["client"], F["source"], F["yt_title"], F["tweet"], F["yt_desc"], F["tt_desc"], F["hashtags"], F["notes"], F["ai_notes"]]})
     return [r for r in recs if any(x in ids for x in (r["fields"].get(F["client"]) or []))]
 
 
@@ -136,8 +141,10 @@ def evidence(rec):
             attrib.append(ln)
     src_url = src.group(1).rstrip(">") if src else None
     video = youtube_info(src_url) if src_url else None
+    known_show = (f.get(F["source"]) or "").strip()
     return {
         "id": rec["id"],
+        "known_show": known_show if known_show and known_show != UNKNOWN else None,
         "title": (f.get(F["title"]) or "").strip(),
         "youtube_title": (f.get(F["yt_title"]) or "").strip() or None,
         "attribution": attrib[:3] or None,
@@ -180,13 +187,16 @@ Rules:
 - If several videos clearly come from the same show, spell it identically. Prefer a name from the known list when it is the same show.
 - Solana's own productions count: "Solana Ecosystem Calls", "Solana Stories", "Solana, New Ideas" when the title says so.
 - If the evidence does not name a show or event, answer null. Do not guess from the speaker alone.
+- "episode": the specific episode or segment the clip came from, as a short label a person would recognise: the guest and/or episode title, plus the date if the evidence gives one ("Turner Novak with Anatoly Yakovenko", "Squawk Box Europe, 9 Sep 2026", "Breakpoint 2025 keynote"). null if the evidence does not say.
+- "url": the link to the original episode/video when the evidence carries one (a source_url, or a YouTube/Spotify/Apple/X link in the research). Copy it exactly; null otherwise. Never invent a URL.
+- A video whose Source Show is already given (field "known_show") keeps that show; only fill the episode and url for it.
 
 Known show names so far: {known}
 
 Videos:
 {videos}
 
-Answer with JSON only: {{"<video id>": "<show name>" or null, ...}} covering every id."""
+Answer with JSON only: {{"<video id>": {{"show": "<show name>" or null, "episode": "<label>" or null, "url": "<link>" or null}}, ...}} covering every id."""
 
 
 def ask(api_key, batch, known, model=None):
@@ -207,10 +217,20 @@ def ask(api_key, batch, known, model=None):
     if not m:
         raise RuntimeError(f"no JSON in answer (stop_reason={body.get('stop_reason')}): {text[:200]}")
     answers = json.loads(m.group(0))
+
+    def clean(x):
+        return x.strip() if isinstance(x, str) and x.strip() and x.strip().lower() not in ("null", "unknown", "none") else None
+
     out = {}
     for v in batch:
         a = answers.get(v["id"])
-        out[v["id"]] = a.strip() if isinstance(a, str) and a.strip() and a.strip().lower() not in ("null", "unknown", "none") else None
+        if isinstance(a, str) or a is None:  # an older-style plain answer
+            a = {"show": a}
+        a = a or {}
+        url = clean(a.get("url"))
+        if url and not re.match(r"https?://", url):
+            url = None
+        out[v["id"]] = {"show": v.get("known_show") or clean(a.get("show")), "episode": clean(a.get("episode")), "url": url}
     return out
 
 
@@ -236,14 +256,18 @@ def sync(dry_run=False, limit=None, retry_unknown=False):
             errors.append(f"{type(e).__name__}: {str(e)[:120]}")
             continue
         for v in batch:
-            show = answers.get(v["id"])
+            a = answers.get(v["id"]) or {}
+            show = a.get("show")
             if show:
                 labelled[v["id"]] = show
                 if show not in known:
                     known.append(show)
             else:
                 unknown.append(v["title"])
-            updates.append({"id": v["id"], "fields": {F["source"]: show or UNKNOWN}})
+            fields = {F["source"]: show or UNKNOWN, F["episode"]: a.get("episode") or UNKNOWN}
+            if a.get("url"):
+                fields[F["url"]] = a["url"]
+            updates.append({"id": v["id"], "fields": fields})
     if updates and not dry_run:
         for i in range(0, len(updates), 10):
             r = requests.patch(f"https://api.airtable.com/v0/{BASE}/{VIDEOS}",
@@ -258,8 +282,11 @@ def sync(dry_run=False, limit=None, retry_unknown=False):
     summary = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "dry_run": dry_run,
                "candidates": len(cands), "labelled": len(labelled), "unknown": len(unknown), "batch_errors": errors,
                "shows": dict(sorted(counts.items(), key=lambda kv: -kv[1])), "unknown_titles": unknown[:20]}
+    summary["episodes"] = sum(1 for u in updates if u["fields"].get(F["episode"]) != UNKNOWN)
+    summary["urls"] = sum(1 for u in updates if u["fields"].get(F["url"]))
     if dry_run:
-        summary["labels"] = {cands_title(c): labelled.get(c["id"]) for c in cands}
+        summary["labels"] = {cands_title(c): {k: u["fields"].get(F[k]) for k in ("source", "episode", "url")}
+                             for c, u in zip(cands, updates)}
     log.info("source show: %s", summary)
     return summary
 

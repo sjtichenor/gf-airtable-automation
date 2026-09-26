@@ -180,7 +180,7 @@ const PRIO = [
   {k:'', label:'Unset', v:'--p4'},
 ];
 let DATA = null, EPS = [], TEAM = [], ME = null, drawerId = null;
-const state = {q:'', show:'', age:'30', prio:new Set(['1 - Highest','2 - High','3 - Medium','4 - Low','']), hideTaken:true, hideClipped:true, showHidden:false, who:''};
+const state = {q:'', show:'', age:'7', prio:new Set(['1 - Highest','2 - High','3 - Medium','4 - Low','']), hideTaken:true, hideClipped:true, showHidden:false, who:''};
 try { state.who = localStorage.getItem('gf-miner') || ''; } catch(e){}
 
 // ── theme, shared key with the other pages ──

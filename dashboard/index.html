@@ -485,7 +485,7 @@ function openVideoDrill(title, list){
   // The Show formula falls through to the channel for clips with no episode
   // of ours, so a Source Show (the podcast the clip was really cut from)
   // wins when the sync has found one.
-  const rows = list.map(v => ({title: v.title || '(untitled)', show: v.source_show || v.show || '', episode: v.episode || '', type: v.type || '',
+  const rows = list.map(v => ({title: v.title || '(untitled)', show: v.source_show || v.show || '', episode: v.episode || v.source_episode || '', type: v.type || '',
     status: v.status || '', editor: v.editor || '', views: v.views, posts: v.posts,
     created: (v.created || '').slice(0,10), finished: (v.finished || '').slice(0,10)}));
   // A video's views are the total across every post it became, whenever those
