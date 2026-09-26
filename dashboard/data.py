@@ -356,6 +356,9 @@ def build_snapshot() -> dict:
             "active": (st.get("name") if isinstance(st, dict) else st) != "Inactive",
             "slack_id": f.get(TE["slack_id"]),
             "photo": _thumb(f.get(TE["photo"])),
+            # The profile hero shows the photo at 96px; Airtable's "small"
+            # thumbnail is 36px and blurs. The large one is ~512px.
+            "photo_large": _thumb_large(f.get(TE["photo"])),
             "start": f.get(TE["start"]),
         })
     team = {t["id"]: t["name"] for t in team_rows}

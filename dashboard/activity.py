@@ -521,7 +521,7 @@ def person_profile(snap: dict, team_id: str) -> Optional[dict]:
     tenure = (today_local().date() - date.fromisoformat(t["start"])).days if t.get("start") else None
 
     return {
-        "person": {"id": t["id"], "name": name, "roles": t.get("roles") or [], "team": t.get("team"), "photo": t.get("photo"),
+        "person": {"id": t["id"], "name": name, "roles": t.get("roles") or [], "team": t.get("team"), "photo": t.get("photo_large") or t.get("photo"),
                    "start": t.get("start"), "tenure_days": tenure, "active": t.get("active", True), "bootcamp_class": t.get("bootcamp_class")},
         "totals": {"edited": len(edited), "finished": len(finished), "directed": len(directed), "mined": len(mined), "posted": len(posted),
                    "views": total_views, "avg_views": round(total_views / len(finished)) if finished else 0,
