@@ -24,7 +24,16 @@ a{color:inherit;text-decoration:none}
 header{border-bottom:1px solid var(--line);background:var(--bg)}
 .bar{max-width:1240px;margin:0 auto;padding:0 32px;height:56px;display:flex;align-items:center;gap:28px}
 .brand{font-weight:600;letter-spacing:-.01em;font-size:15px;display:flex;align-items:center;gap:10px}
-.brand i{width:8px;height:8px;border-radius:2px;background:var(--ink);display:inline-block}
+.brand .mark{flex:none}
+/* Branding that survives a screenshot: a byline under the title, a credit
+   strip on the leaderboard card, and a footer line with the URL. */
+.byline{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);margin:0 0 28px}
+.byline .mark{width:16px;height:16px}
+.byline b{color:var(--ink);font-weight:600}
+.card .credit{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;border-top:1px solid var(--line);font-size:11px;color:var(--ink3);letter-spacing:.02em}
+.card .credit .who{display:flex;align-items:center;gap:8px;color:var(--ink2);font-weight:500}
+.card .credit .who .mark{width:14px;height:14px}
+.foot .site{color:var(--ink);font-weight:500}
 .nav{display:flex;gap:22px;margin-left:8px}
 .nav a{color:var(--ink2);font-weight:500;font-size:13px;padding:18px 0;border-bottom:2px solid transparent}
 .nav a.on{color:var(--ink);border-bottom-color:var(--ink)}
@@ -70,16 +79,17 @@ tr.ours .pill{border-color:var(--ours);color:var(--ours)}
 </head>
 <body>
 <header><div class="bar">
-  <a class="brand" href="/dashboard"><i></i>Good Future Media</a>
+  <a class="brand" href="/dashboard"><svg class="mark" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><circle cx="32" cy="32" r="32" fill="url(#g)"/><path d="M40.5 22.5a12 12 0 1 0 3.2 11.2H32" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>Good Future Media</a>
   <nav class="nav"><a href="/dashboard">Overview</a><a href="/dashboard/team">Team</a><a href="/dashboard/mine">Mine</a><a class="on" href="/dashboard/vc">VC Pods</a><a href="/dashboard/links">Dashboards</a></nav>
   <div class="right"><span id="meta"></span><button class="ghost" id="theme">Dark</button><a class="ghost" href="/dashboard/logout">Sign out</a></div>
 </div></header>
 <main>
   <div class="eyebrow">Benchmark</div>
   <h1>VC podcast rankings</h1>
-  <p class="lead">Every show tagged Venture Capital, ranked by the following of its official accounts. Ranks are per platform; the total sums the platforms we track for that show.</p>
+  <p class="lead" style="margin-bottom:12px">Every show tagged Venture Capital, ranked by the following of its official accounts. Ranks are per platform; the total sums the platforms we track for that show.</p>
+  <p class="byline"><svg class="mark" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><circle cx="32" cy="32" r="32" fill="url(#g2)"/><path d="M40.5 22.5a12 12 0 1 0 3.2 11.2H32" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>Compiled by <b>Good Future Media</b> · the podcast clipping studio · goodfuturemedia.com</p>
   <div class="kpis" id="kpis"></div>
-  <div class="card"><div class="hd"><h2>Leaderboard</h2><span id="sub">Click a column to sort</span></div><div class="wrap"><table id="t"></table></div></div>
+  <div class="card"><div class="hd"><h2>Leaderboard</h2><span id="sub">Click a column to sort</span></div><div class="wrap"><table id="t"></table></div><div class="credit"><span class="who"><svg class="mark" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true"><defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><circle cx="32" cy="32" r="32" fill="url(#g3)"/><path d="M40.5 22.5a12 12 0 1 0 3.2 11.2H32" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>Good Future Media · VC Podcast Rankings</span><span id="asof"></span></div></div>
   <div class="foot" id="foot"></div>
 </main>
 <script>
@@ -110,7 +120,9 @@ function render(){
     ...(leader ? [['Leader', esc(leader.name), `${short(leader.total)} combined`]] : []),
     ...ours.map(r => [esc(r.name), `#${r.rank.total} of ${D.ranked.total}`, D.platforms.filter(p=>r.rank[p]).map(p=>`#${r.rank[p]} ${p}`).join(' · ')]),
   ].map(([l,v,s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
-  $('#foot').textContent = `Counts are the Channels follower fields: X and YouTube refresh daily, other platforms as their syncs allow. Firm-run shows (YC, Sequoia, First Round, Lightspeed, Bessemer, Greylock, Village Global) are ranked on the firm's accounts. Data as of ${(D.generated_at||'').replace('T',' ').slice(0,16)} UTC.`;
+  const asof = (D.generated_at||'').replace('T',' ').slice(0,16) + ' UTC';
+  $('#asof').textContent = `Data as of ${asof}`;
+  $('#foot').innerHTML = `Counts are the Channels follower fields: X and YouTube refresh daily, other platforms as their syncs allow. Firm-run shows (YC, Sequoia, First Round, Lightspeed, Bessemer, Greylock, Village Global) are ranked on the firm's accounts. Rankings compiled by <span class="site">Good Future Media · goodfuturemedia.com</span>.`;
   $('#meta').textContent = `${D.rows.length} shows` + (D.pending ? ` · ${D.pending} awaiting first sync` : '');
 }
 fetch('/dashboard/api/vc', {credentials:'same-origin'}).then(r => r.json()).then(d => { D = d; if (!d.rows) throw 0; render(); }).catch(() => { $('#t').innerHTML = '<tr><td class="empty">Nothing to rank yet — counts arrive after the next follower sync.</td></tr>'; });
