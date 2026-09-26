@@ -11,7 +11,7 @@ the server's.
 """
 import os
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 TZ_NAME = os.environ.get("DIGEST_TZ", "America/New_York")
@@ -27,6 +27,7 @@ AFTER_EDIT = {"Internal Review", "Client Review", "Ready to Post", "Video Shippe
 OPEN_STATUSES = ["Up For Grabs", "Assigned", "Editing", "Needs More Edits", "Internal Review", "Client Review", "Ready to Post"]
 STUCK_AFTER_DAYS = {"Up For Grabs": 5, "Assigned": 3, "Editing": 3, "Needs More Edits": 2, "Internal Review": 2, "Client Review": 5, "Ready to Post": 2}
 WORK_ROLES = {"Editor", "Director", "Social Media Manager", "Bootcamp Recruit"}
+ACTIVITY_WINDOW_NOTE = os.environ.get("DASHBOARD_ACTIVITY_DAYS", "120") + " days"
 
 KIND_LABEL = {
     "picked_up": "Picked up", "started": "Started editing", "finished": "Finished edit", "dropped": "Dropped",
@@ -182,7 +183,7 @@ def summary(snap: dict, days: int = 90) -> dict:
         key = (name, section)
         if key not in cards:
             t = team.get(name, {})
-            cards[key] = {"name": name, "group": section, "roles": t.get("roles") or [], "team": t.get("team"),
+            cards[key] = {"name": name, "id": t.get("id"), "group": section, "roles": t.get("roles") or [], "team": t.get("team"),
                           "active": t.get("active", True), "bootcamp_class": t.get("bootcamp_class"),
                           "photo": t.get("photo"), "in_team": name in team, "by_day": {}, "totals": {}, "windows": {},
                           "last_active": None, "quiet_days": None, "in_progress": []}
@@ -401,3 +402,118 @@ def digest_window(for_day=None):
     if d.weekday() == 0:
         return d - timedelta(days=3), d - timedelta(days=1)
     return d - timedelta(days=1), d - timedelta(days=1)
+
+
+# ── one person, all time ────────────────────────────────────────────────
+
+MILESTONE_COUNTS = (1, 10, 25, 50, 100, 250, 500, 1000)
+
+
+def _month(iso):
+    return (iso or "")[:7] or None
+
+
+def person_profile(snap: dict, team_id: str) -> Optional[dict]:
+    """Everything the board knows about one person, across the whole Videos
+    table rather than the activity window: output by month, views, best
+    clips, milestones with the date each was reached, and the badges those
+    imply. The status-log window (ACTIVITY_DAYS) still bounds streaks and
+    revision counts, and the profile says so."""
+    t = next((x for x in snap.get("team", []) if x["id"] == team_id), None)
+    if not t:
+        return None
+    name = t["name"]
+    videos = snap.get("videos", [])
+    posts = snap.get("posts", [])
+
+    def fin_date(v):
+        return (v.get("finished") or "")[:10] or None
+
+    edited = [v for v in videos if v.get("editor") == name]
+    finished = sorted([v for v in edited if fin_date(v) or v.get("status") == "Video Shipped"],
+                      key=lambda v: fin_date(v) or (v.get("created") or "")[:10])
+    directed = [v for v in videos if v.get("director") == name]
+    mined = [v for v in videos if v.get("miner") == name or v.get("created_by") == name]
+    posted = [p for p in posts if p.get("poster") == name]
+
+    by_month: Dict[str, dict] = {}
+    for v in finished:
+        m = _month(fin_date(v) or v.get("created"))
+        if not m:
+            continue
+        row = by_month.setdefault(m, {"month": m, "finished": 0, "views": 0})
+        row["finished"] += 1
+        row["views"] += int(v.get("views") or 0)
+    months = [by_month[m] for m in sorted(by_month)]
+
+    total_views = sum(int(v.get("views") or 0) for v in edited)
+    top = sorted((v for v in edited if v.get("views")), key=lambda v: -int(v["views"]))[:8]
+    shows = sorted({v.get("show") for v in edited if v.get("show")})
+
+    # Milestones: the nth finished clip and the date it landed; view clubs by
+    # the clip's finish date (views are today's totals, so "first 1M clip" is
+    # the earliest clip that has since passed 1M).
+    milestones = []
+    for n in MILESTONE_COUNTS:
+        if len(finished) >= n:
+            v = finished[n - 1]
+            milestones.append({"kind": "count", "label": f"{n:,}{'st' if n == 1 else 'th'} clip finished", "date": fin_date(v) or (v.get('created') or '')[:10], "title": v.get("title")})
+    for threshold, label in ((100_000, "First 100k-view clip"), (1_000_000, "First 1M-view clip")):
+        hits = [v for v in finished if int(v.get("views") or 0) >= threshold]
+        if hits:
+            v = hits[0]
+            milestones.append({"kind": "views", "label": label, "date": fin_date(v) or (v.get('created') or '')[:10], "title": v.get("title"), "views": v.get("views")})
+    if months:
+        best = max(months, key=lambda r: r["finished"])
+        milestones.append({"kind": "month", "label": f"Best month: {best['finished']} clips", "date": best["month"] + "-01", "title": None})
+    if t.get("start"):
+        milestones.append({"kind": "start", "label": "Joined", "date": t["start"], "title": None})
+    milestones.sort(key=lambda m: m["date"] or "")
+
+    # Streaks and revisions come from the status logs, so only the window.
+    events = [e for e in build_events(snap) if e["person"] == name]
+    days = sorted({e["date"] for e in events})
+    longest, cur, prev = 0, 0, None
+    for d in days:
+        cur = cur + 1 if prev and (date.fromisoformat(d) - date.fromisoformat(prev)).days == 1 else 1
+        longest = max(longest, cur)
+        prev = d
+    kinds: Dict[str, int] = {}
+    for e in events:
+        kinds[e["kind"]] = kinds.get(e["kind"], 0) + 1
+    win_finished, win_rev = kinds.get("finished", 0), kinds.get("revision_started", 0)
+
+    clubs_1m = sum(1 for v in edited if int(v.get("views") or 0) >= 1_000_000)
+    clubs_100k = sum(1 for v in edited if int(v.get("views") or 0) >= 100_000)
+    badges = []
+    for n, label in ((1000, "1,000 Club"), (500, "500 Club"), (250, "250 Club"), (100, "Century"), (50, "Fifty")):
+        if len(finished) >= n:
+            badges.append({"label": label, "detail": f"{len(finished):,} clips finished"})
+            break
+    if clubs_1m:
+        badges.append({"label": "1M Club", "detail": f"{clubs_1m} clip{'s' if clubs_1m != 1 else ''} past a million views"})
+    if clubs_100k:
+        badges.append({"label": "100k Club", "detail": f"{clubs_100k} clip{'s' if clubs_100k != 1 else ''} past 100k views"})
+    if longest >= 7:
+        badges.append({"label": f"{longest}-day streak", "detail": f"longest run of consecutive active days in the last {ACTIVITY_WINDOW_NOTE}"})
+    if len(shows) >= 5:
+        badges.append({"label": "Range", "detail": f"clips for {len(shows)} different shows"})
+    if win_finished >= 10 and win_rev / max(win_finished, 1) <= 0.15:
+        badges.append({"label": "Clean cuts", "detail": f"{win_rev} revisions on {win_finished} clips in the window"})
+    tenure = (today_local().date() - date.fromisoformat(t["start"])).days if t.get("start") else None
+
+    return {
+        "person": {"id": t["id"], "name": name, "roles": t.get("roles") or [], "team": t.get("team"), "photo": t.get("photo"),
+                   "start": t.get("start"), "tenure_days": tenure, "active": t.get("active", True), "bootcamp_class": t.get("bootcamp_class")},
+        "totals": {"edited": len(edited), "finished": len(finished), "directed": len(directed), "mined": len(mined), "posted": len(posted),
+                   "views": total_views, "avg_views": round(total_views / len(finished)) if finished else 0,
+                   "posts": sum(int(v.get("posts") or 0) for v in edited), "shows": len(shows),
+                   "first_finished": fin_date(finished[0]) if finished else None, "last_finished": fin_date(finished[-1]) if finished else None},
+        "window": {"days": ACTIVITY_WINDOW_NOTE, "finished": win_finished, "revisions": win_rev, "active_days": len(days), "longest_streak": longest, "kinds": kinds},
+        "months": months,
+        "top": [{"id": v["id"], "title": v.get("title"), "show": v.get("show"), "views": v.get("views"), "posts": v.get("posts"), "finished": fin_date(v)} for v in top],
+        "recent": [{"id": v["id"], "title": v.get("title"), "show": v.get("show"), "views": v.get("views"), "finished": fin_date(v)} for v in finished[-12:][::-1]],
+        "milestones": milestones,
+        "badges": badges,
+        "shows": shows,
+    }

@@ -44,6 +44,7 @@ h2.grp{display:flex;align-items:baseline;gap:10px}h2.grp span{font-weight:400;co
 .who{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .avatar{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:14px;object-fit:cover;flex:none}
 .who .n{font-weight:700;font-size:14px}.who .r{font-size:12px;color:var(--muted)}
+.plink{color:inherit}.plink:hover{color:var(--accent)}.plink .avatar{cursor:pointer}
 .badge{margin-left:auto;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--muted)}
 .badge.quiet{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
 .badge.today{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
@@ -186,7 +187,8 @@ function render(){
     const av = p.photo ? `<img class="avatar" src="${esc(p.photo)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'avatar',textContent:'${initials}'}))">` : `<div class="avatar">${initials}</div>`;
     const q = p.quiet_days; const badge = q==null ? '<span class="badge">no activity loaded</span>' : q===0 ? '<span class="badge today">active today</span>' : q>=2 ? `<span class="badge quiet">quiet ${q}d</span>` : `<span class="badge">last active yesterday</span>`;
     const wip = p.in_progress.length ? `<div class="wip"><b>${p.in_progress.length} in progress:</b> ` + p.in_progress.slice(0,3).map(w => `${esc((w.title||'').slice(0,48))} <span>(${w.status}, ${w.days!=null?w.days.toFixed(0)+'d':'?'})</span>`).join(' · ') + (p.in_progress.length>3?` · +${p.in_progress.length-3} more`:'') + '</div>' : '';
-    return `<div class="card"><div class="who">${av}<div><div class="n">${esc(p.name)}</div><div class="r">${esc(p.roles.join(' · ') || 'No Team row')}${p.bootcamp_class?' · '+esc(p.bootcamp_class):''}${p.group==='Social' && !p.roles.includes('Social Media Manager') ? ' · posts' : ''}</div></div>${badge}</div>
+    const link = p.id ? `/dashboard/team/${esc(p.id)}` : null;
+    return `<div class="card"><div class="who">${link ? `<a class="plink" href="${link}" title="Open ${esc(p.name)}'s profile">${av}</a>` : av}<div><div class="n">${link ? `<a class="plink" href="${link}">${esc(p.name)}</a>` : esc(p.name)}</div><div class="r">${esc(p.roles.join(' · ') || 'No Team row')}${p.bootcamp_class?' · '+esc(p.bootcamp_class):''}${p.group==='Social' && !p.roles.includes('Social Media Manager') ? ' · posts' : ''}</div></div>${badge}</div>
       <div class="stats">${statsFor(p)}</div>${heat(p)}${wip}</div>`; };
   $('#people').innerHTML = ps.length ? GROUPS.map(([g, label]) => { const list = ps.filter(p=>p.group===g); if (!list.length) return '';
       const active = list.filter(p=>p.quiet_days===0).length, quiet = list.filter(p=>p.quiet_days>=2).length;

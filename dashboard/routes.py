@@ -277,6 +277,26 @@ def team_page(request: Request):
     return HTMLResponse(_read("team.html"))
 
 
+@router.get("/team/{team_id}", response_class=HTMLResponse)
+def person_page(request: Request, team_id: str):
+    if not auth.is_authed(request):
+        return RedirectResponse("/dashboard/login", status_code=303)
+    return HTMLResponse(_read("person.html"))
+
+
+@router.get("/api/person/{team_id}")
+def api_person(request: Request, team_id: str):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    snap = cache.snapshot
+    if snap is None:
+        return JSONResponse({"error": "warming up", **cache.status()}, status_code=503, headers={"Retry-After": "5"})
+    prof = activity.person_profile(snap, team_id)
+    if not prof:
+        return JSONResponse({"error": "no such person"}, status_code=404)
+    return JSONResponse(prof, headers={"Cache-Control": "private, max-age=60"})
+
+
 def _me(request: Request, snap: dict) -> dict:
     """Identity for the pages: name, team id if the Team table knows them,
     and whether they may act as someone else."""

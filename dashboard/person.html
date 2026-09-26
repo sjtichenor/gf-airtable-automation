@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Good Future Media · Profile</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="32x32"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --border:#e5e8ee; --text:#0f172a; --muted:#64748b; --muted2:#94a3b8;
+  --accent:#2563eb; --accent-soft:#dbeafe; --up:#16a34a; --down:#dc2626; --warn:#d97706; --chip:#eef2f7; --chip-on:#0f172a; --chip-on-text:#fff;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12); --grid:#eef1f5; --cell:#e9edf3;
+}
+/* Kept in step with the same block in index.html. --muted (every 12px label)
+   went from 5.9:1 to 7.9:1 against --card, --muted2 from 3.1:1 to 5.5:1, and
+   --cell lifted so an empty heatmap square still reads against the new card. */
+html[data-theme=dark]{
+  --bg:#0b0e14; --card:#161c29; --border:#2b3547; --text:#e6e9ef; --muted:#a7b1c2; --muted2:#8a93a3;
+  --accent:#5b9dff; --accent-soft:#17263f; --up:#34d399; --down:#f87171; --warn:#fbbf24; --chip:#1f2735; --chip-on:#e6e9ef; --chip-on-text:#0b0e14;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px -16px rgba(0,0,0,.6); --grid:#2a3344; --cell:#232c3d;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.bar{max-width:1440px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.01em;font-size:16px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed)}
+.brand span.sub{font-weight:500;color:var(--muted);margin-left:6px}
+.nav{display:flex;gap:4px;margin-left:8px}.nav a{padding:6px 10px;border-radius:8px;color:var(--muted);font-weight:500}.nav a.on{background:var(--chip);color:var(--text)}
+.spacer{flex:1}
+.meta{color:var(--muted);font-size:12px;display:flex;gap:14px;align-items:center}
+button.ghost,a.ghost{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;cursor:pointer;font:inherit;font-size:12px}
+main{max-width:1440px;margin:0 auto;padding:20px 24px 60px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.filters select,.filters input[type=date]{appearance:none;background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font:inherit;font-size:13px;box-shadow:var(--shadow)}
+.toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
+h2{font-size:15px;margin:26px 0 10px;font-weight:700}
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}
+h2.grp{display:flex;align-items:baseline;gap:10px}h2.grp span{font-weight:400;color:var(--muted);font-size:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
+.who{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:14px;object-fit:cover;flex:none}
+.who .n{font-weight:700;font-size:14px}.who .r{font-size:12px;color:var(--muted)}
+.plink{color:inherit}.plink:hover{color:var(--accent)}.plink .avatar{cursor:pointer}
+.badge{margin-left:auto;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--muted)}
+.badge.quiet{background:color-mix(in srgb,var(--down) 15%,transparent);color:var(--down)}
+.badge.today{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.stats{display:flex;gap:18px;margin:8px 0 12px;flex-wrap:wrap}
+.stat .v{font-size:18px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.stat .l{font-size:11px;color:var(--muted)}
+.heat{display:flex;gap:3px;overflow:hidden}
+.heat .col{display:flex;flex-direction:column;gap:3px}
+.heat .c{width:11px;height:11px;border-radius:2px;background:var(--cell);cursor:pointer}
+.heat .c.l1{background:color-mix(in srgb,var(--accent) 30%,var(--cell))}.heat .c.l2{background:color-mix(in srgb,var(--accent) 55%,var(--cell))}.heat .c.l3{background:color-mix(in srgb,var(--accent) 80%,var(--cell))}.heat .c.l4{background:var(--accent)}
+.heat .c.sel{outline:2px solid var(--warn);outline-offset:1px}
+.heat .c.future{opacity:.25}
+.months{display:flex;font-size:10px;color:var(--muted2);margin-bottom:4px;height:12px;position:relative}
+.wip{margin-top:10px;font-size:12px;color:var(--muted)}
+.wip b{color:var(--text);font-weight:600}
+.ev{display:grid;grid-template-columns:52px 130px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:baseline}
+.ev .t{color:var(--muted);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:var(--chip);color:var(--text)}
+.pill.finished,.pill.approved,.pill.posted{background:color-mix(in srgb,var(--up) 18%,transparent);color:var(--up)}
+.pill.sent_back,.pill.dropped{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
+.pill.started,.pill.picked_up,.pill.revision_started,.pill.created{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.ev .d{color:var(--muted);font-size:12px}
+.ev .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.span12{grid-column:span 12}.span6{grid-column:span 6}.span4{grid-column:span 4}
+@media(max-width:1000px){.span6,.span4{grid-column:span 12}}
+.pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.pipe .k{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.pipe .k .v{font-size:22px;font-weight:800}.pipe .k .l{font-size:12px;color:var(--muted)}.pipe .k .s{font-size:11px;color:var(--down);margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);padding:24px;text-align:center}
+#overlay{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:20;font-size:15px;color:var(--muted);text-align:center;padding:20px}
+#overlay b{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
+.person-h{font-weight:700;margin:14px 0 4px;display:flex;gap:10px;align-items:baseline}.person-h span{font-weight:400;color:var(--muted);font-size:12px}
+.digest{white-space:pre-wrap;font-size:13px;line-height:1.5}
+
+.hero{display:flex;gap:18px;align-items:center;margin:6px 0 18px;flex-wrap:wrap}
+.hero .avatar{width:72px;height:72px;font-size:24px}
+.hero h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.hero .r{color:var(--muted);font-size:13px;margin-top:2px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.bdg{display:inline-flex;flex-direction:column;padding:6px 10px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700}
+.bdg small{font-weight:500;color:var(--muted);font-size:11px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.tile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.tile .v{font-size:22px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.tile .l{font-size:11px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1.2fr 1fr;gap:14px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);min-width:0}
+.panel h2{margin:0 0 10px;font-size:14px}
+.panel h2 span{font-weight:400;color:var(--muted);font-size:12px;margin-left:6px}
+.bars{display:flex;align-items:flex-end;gap:4px;height:120px;overflow-x:auto;padding-bottom:18px;position:relative}
+.bar{flex:1 0 14px;min-width:14px;background:var(--accent);border-radius:3px 3px 0 0;position:relative;opacity:.9}
+.bar:hover{opacity:1}
+.bar .n{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);white-space:nowrap}
+.bar .m{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--muted2);white-space:nowrap}
+.tl{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--border)}
+.tl li{position:relative;padding:0 0 12px 14px;font-size:13px}
+.tl li::before{content:"";position:absolute;left:-19px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.tl li.views::before{background:var(--up)}.tl li.start::before{background:var(--warn)}.tl li.month::before{background:#7c3aed}
+.tl .d{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tl .t{color:var(--muted);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.empty{color:var(--muted);font-size:13px;padding:8px 0}
+.note{font-size:11px;color:var(--muted2);margin-top:8px}
+.loading{color:var(--muted);padding:40px;text-align:center}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <span class="brand"><span class="dot"></span>Good Future Media<span class="sub">Profile</span></span>
+  <nav class="nav"><a href="/dashboard">Overview</a><a class="on" href="/dashboard/team">Team</a><a href="/dashboard/mine">Mine</a><a href="/dashboard/links">Dashboards</a></nav>
+  <div class="spacer"></div>
+  <div class="meta"><span id="stamp"></span></div>
+  <button class="ghost" id="theme">Dark</button><a class="ghost" href="/dashboard/logout">Sign out</a>
+</div></header>
+<main>
+  <div id="app" class="loading">Loading…</div>
+</main>
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => (n||0).toLocaleString();
+const nice = iso => iso ? new Date(iso.slice(0,10)+'T00:00:00').toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : '—';
+const mon = ym => new Date(ym+'-01T00:00:00').toLocaleDateString(undefined,{month:'short',year:'2-digit'});
+(function(){ const root=document.documentElement, btn=$('#theme'); let saved=null; try{saved=localStorage.getItem('gf-theme')}catch(e){}
+  if(saved) root.setAttribute('data-theme',saved); const label=()=>btn.textContent=root.getAttribute('data-theme')==='dark'?'Light':'Dark'; label();
+  btn.onclick=()=>{const n=root.getAttribute('data-theme')==='dark'?'light':'dark'; root.setAttribute('data-theme',n); try{localStorage.setItem('gf-theme',n)}catch(e){} label();}; })();
+
+const id = location.pathname.split('/').pop();
+async function load(){
+  const r = await fetch('/dashboard/api/person/' + encodeURIComponent(id), {credentials:'same-origin'});
+  if (r.status === 503) { setTimeout(load, 5000); return; }
+  if (r.status === 401) { location.href = '/dashboard/login'; return; }
+  if (!r.ok) { $('#app').innerHTML = '<div class="empty">No profile for this id. <a href="/dashboard/team">Back to Team</a></div>'; return; }
+  render(await r.json());
+}
+function render(P){
+  const p = P.person, T = P.totals, W = P.window;
+  document.title = `Good Future Media · ${p.name}`;
+  const initials = p.name.split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+  const av = p.photo ? `<img class="avatar" src="${esc(p.photo)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'avatar',textContent:'${initials}'}))">` : `<div class="avatar">${initials}</div>`;
+  const tenure = p.tenure_days!=null ? (p.tenure_days>=365 ? `${(p.tenure_days/365).toFixed(1)} years` : `${p.tenure_days} days`) : null;
+  const sub = [p.roles.join(' · ') || 'No role set', p.bootcamp_class, p.team, p.start ? `joined ${nice(p.start)}${tenure?` · ${tenure}`:''}` : null, p.active ? null : 'no longer active'].filter(Boolean).join(' · ');
+  const badges = P.badges.length ? `<div class="badges">${P.badges.map(b=>`<span class="bdg">${esc(b.label)}<small>${esc(b.detail)}</small></span>`).join('')}</div>` : '';
+  const tiles = [
+    ['Clips finished', fmt(T.finished)], ['Total views', fmt(T.views)], ['Avg views / clip', fmt(T.avg_views)],
+    ['Posts from their clips', fmt(T.posts)], ['Shows', fmt(T.shows)], ['Directed', fmt(T.directed)], ['Mined', fmt(T.mined)], ['Posted', fmt(T.posted)],
+  ].filter(([l,v]) => !(v==='0' && ['Directed','Mined','Posted'].includes(l)));
+  const maxF = Math.max(1, ...P.months.map(m=>m.finished));
+  const bars = P.months.length ? `<div class="bars">${P.months.map(m=>`<div class="bar" style="height:${Math.max(4, m.finished/maxF*100)}%" title="${mon(m.month)}: ${m.finished} clips, ${fmt(m.views)} views"><span class="n">${m.finished}</span><span class="m">${mon(m.month)}</span></div>`).join('')}</div>` : '<div class="empty">No finished clips yet.</div>';
+  const tl = P.milestones.length ? `<ul class="tl">${P.milestones.slice().reverse().map(m=>`<li class="${m.kind}"><div class="d">${nice(m.date)}</div><div>${esc(m.label)}${m.views?` · ${fmt(m.views)} views`:''}</div>${m.title?`<div class="t">${esc(m.title)}</div>`:''}</li>`).join('')}</ul>` : '<div class="empty">Nothing yet.</div>';
+  const rows = (list, withPosts) => list.length ? `<table><thead><tr><th>Clip</th><th>Show</th><th class="n">Views</th>${withPosts?'<th class="n">Posts</th>':''}<th class="n">Finished</th></tr></thead><tbody>` +
+    list.map(v=>`<tr><td>${esc(v.title||'')}</td><td>${esc(v.show||'')}</td><td class="n">${fmt(v.views)}</td>${withPosts?`<td class="n">${fmt(v.posts)}</td>`:''}<td class="n">${v.finished?nice(v.finished):'—'}</td></tr>`).join('') + '</tbody></table>' : '<div class="empty">None.</div>';
+  const rev = W.finished ? Math.round(100*W.revisions/W.finished) : null;
+  $('#app').className = '';
+  $('#app').innerHTML = `
+    <div class="hero">${av}<div><h1>${esc(p.name)}</h1><div class="r">${esc(sub)}</div>${badges}</div></div>
+    <div class="tiles">${tiles.map(([l,v])=>`<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('')}</div>
+    <div class="grid2">
+      <div class="panel"><h2>Clips finished by month<span>${T.first_finished?`${nice(T.first_finished)} → ${nice(T.last_finished)}`:''}</span></h2>${bars}</div>
+      <div class="panel"><h2>Last ${esc(W.days)}<span>from the status log</span></h2>
+        <div class="tiles" style="margin:0">
+          <div class="tile"><div class="v">${fmt(W.finished)}</div><div class="l">Finished</div></div>
+          <div class="tile"><div class="v">${rev==null?'—':rev+'%'}</div><div class="l">Revision rate</div></div>
+          <div class="tile"><div class="v">${fmt(W.active_days)}</div><div class="l">Active days</div></div>
+          <div class="tile"><div class="v">${fmt(W.longest_streak)}</div><div class="l">Longest streak (days)</div></div>
+        </div>
+        <div class="note">Streaks and revisions come from the Video Status Logs, which the board loads for the last ${esc(W.days)}. Everything else is all-time from the Videos table.</div>
+      </div>
+      <div class="panel"><h2>Milestones</h2>${tl}<div class="note">View milestones use today's view totals, so "first 1M clip" is the earliest clip that has since passed a million.</div></div>
+      <div class="panel"><h2>Top clips<span>by views</span></h2>${rows(P.top, true)}</div>
+      <div class="panel" style="grid-column:1/-1"><h2>Most recent<span>last ${P.recent.length} finished</span></h2>${rows(P.recent, false)}</div>
+    </div>`;
+}
+load();
+})();
+</script>
+</body>
+</html>

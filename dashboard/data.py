@@ -647,7 +647,8 @@ def fake_snapshot() -> dict:
                        "episode": (f"Episode {300 - n // 3}: " + rnd.choice(["The bond market is warning us", "Why nobody trusts the news", "AI bears are asking the wrong question"])) if n % 5 else None,
                        "miner": rnd.choice(editors), "client": None, "type": "Clip", "tier": "1 - Basic", "status": cur,
                        "status_since": hist[-1][1].isoformat(timespec="seconds") + "Z", "created": t0.isoformat(timespec="seconds") + "Z",
-                       "created_by": rnd.choice(editors), "started": None, "finished": None, "speaker": "",
+                       "created_by": rnd.choice(editors), "started": None,
+                       "finished": (t.date() - timedelta(days=rnd.randint(0, 400))).isoformat() if cur in ("Video Shipped", "Ready to Post") or n % 3 == 0 else None, "speaker": "",
                        "views": int(rnd.lognormvariate(9, 1.4)), "posts": rnd.randint(1, 5)})
         for st, a, b in hist:
             status_logs.append({"video": f"v{n}", "status": st, "start": a.isoformat(timespec="seconds") + "Z", "end": b.isoformat(timespec="seconds") + "Z" if b else None})
