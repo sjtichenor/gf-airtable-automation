@@ -30,9 +30,13 @@ def table(snap: dict) -> dict:
             vals = [c["followers"][p] for c in official if isinstance((c.get("followers") or {}).get(p), (int, float))]
             if vals:
                 counts[p] = int(max(vals))
-        if not counts:
-            continue  # nothing to rank yet (no accounts, or the syncs have not run)
+        # A show with accounts but no counts yet (added today, syncs not run)
+        # still gets a row, marked pending, so the page shows the field and
+        # not a mystery gap.
+        if not counts and not chans:
+            continue
         rows.append({
+            "pending": not counts,
             "id": sh["id"], "name": sh["name"], "relationship": sh.get("relationship"),
             "ours": sh.get("relationship") in ("Client", "Owned"),
             "logo": sh.get("logo"),
@@ -42,7 +46,7 @@ def table(snap: dict) -> dict:
     # Ranks per platform and overall; ties share a rank.
     ranks = {}
     for p in PLATFORMS + ["total"]:
-        have = [r for r in rows if (p == "total" or p in r["counts"])]
+        have = [r for r in rows if not r["pending"] and (p == "total" or p in r["counts"])]
         have.sort(key=lambda r: -(r["total"] if p == "total" else r["counts"][p]))
         pos, prev = 0, None
         for i, r in enumerate(have):
@@ -51,5 +55,6 @@ def table(snap: dict) -> dict:
                 pos, prev = i + 1, v
             r.setdefault("rank", {})[p] = pos
         ranks[p] = len(have)
-    rows.sort(key=lambda r: -r["total"])
-    return {"rows": rows, "platforms": [p for p in PLATFORMS if ranks.get(p)], "ranked": ranks, "generated_at": snap.get("generated_at")}
+    rows.sort(key=lambda r: (r["pending"], -r["total"], r["name"].lower()))
+    return {"rows": rows, "platforms": [p for p in PLATFORMS if ranks.get(p)], "ranked": ranks,
+            "pending": sum(1 for r in rows if r["pending"]), "generated_at": snap.get("generated_at")}

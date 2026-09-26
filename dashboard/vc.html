@@ -58,6 +58,7 @@ td .r.top{color:var(--gold);font-weight:600}
 td .bar{display:inline-block;height:4px;border-radius:2px;background:var(--line);vertical-align:middle;margin-left:10px;width:72px;position:relative;overflow:hidden}
 td .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ink);opacity:.55}
 tr.ours td{background:var(--accent-soft)}
+tr.pending td{color:var(--ink3)}
 tr.ours td.show{box-shadow:inset 3px 0 0 var(--ours)}
 .pill{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--ink2);margin-left:8px;vertical-align:middle}
 tr.ours .pill{border-color:var(--ours);color:var(--ours)}
@@ -98,19 +99,19 @@ function render(){
   const max = {}; D.platforms.forEach(p => max[p] = Math.max(...D.rows.map(r => r.counts[p] || 0)));
   const cols = [['rank','#'], ['name','Show'], ...D.platforms.map(p => [p, p]), ['total','Total']];
   $('#t').innerHTML = '<thead><tr>' + cols.map(([k,l]) => `<th class="${k==='name'||k==='rank'?'':'n'}" data-k="${k}">${l}${sort.k===k?(sort.d<0?' ↓':' ↑'):''}</th>`).join('') + '</tr></thead><tbody>'
-    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}"><td class="rank">${i+1}</td><td class="show">${esc(r.name)}${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
+    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}${r.pending?' pending':''}"><td class="rank">${r.pending?'—':i+1}</td><td class="show">${esc(r.name)}${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
       + D.platforms.map(p => r.counts[p] == null ? '<td class="n dash">—</td>' : `<td class="n"><span class="r ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${fmt(r.counts[p])}<span class="bar"><i style="width:${Math.max(2, 100*r.counts[p]/(max[p]||1)).toFixed(0)}%"></i></span></td>`).join('')
-      + `<td class="n"><b>${fmt(r.total)}</b></td></tr>`).join('') + '</tbody>';
+      + `<td class="n">${r.pending?'<span class="dash" title="Accounts added; counts arrive with the next follower sync">awaiting sync</span>':`<b>${fmt(r.total)}</b>`}</td></tr>`).join('') + '</tbody>';
   $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (k === 'rank') return; sort = {k, d: sort.k===k ? -sort.d : (k==='name'?1:-1)}; render(); });
   const ours = D.rows.filter(r => r.ours);
   const leader = D.rows[0];
   $('#kpis').innerHTML = [
-    ['Shows ranked', D.rows.length, `${D.platforms.length} platforms tracked`],
+    ['Shows ranked', D.ranked.total, D.pending ? `${D.pending} more awaiting their first sync` : `${D.platforms.length} platforms tracked`],
     ...(leader ? [['Leader', esc(leader.name), `${short(leader.total)} combined`]] : []),
     ...ours.map(r => [esc(r.name), `#${r.rank.total} of ${D.ranked.total}`, D.platforms.filter(p=>r.rank[p]).map(p=>`#${r.rank[p]} ${p}`).join(' · ')]),
   ].map(([l,v,s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   $('#foot').textContent = `Counts are the Channels follower fields: X and YouTube refresh daily, other platforms as their syncs allow. Firm-run shows (YC, Sequoia, First Round, Lightspeed, Bessemer, Greylock, Village Global) are ranked on the firm's accounts. Data as of ${(D.generated_at||'').replace('T',' ').slice(0,16)} UTC.`;
-  $('#meta').textContent = `${D.rows.length} shows`;
+  $('#meta').textContent = `${D.rows.length} shows` + (D.pending ? ` · ${D.pending} awaiting first sync` : '');
 }
 fetch('/dashboard/api/vc', {credentials:'same-origin'}).then(r => r.json()).then(d => { D = d; if (!d.rows) throw 0; render(); }).catch(() => { $('#t').innerHTML = '<tr><td class="empty">Nothing to rank yet — counts arrive after the next follower sync.</td></tr>'; });
 })();
