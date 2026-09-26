@@ -220,6 +220,13 @@ def fill_from_socialblade(findings):
         filled.append(f)
     if not updates:
         return
+    # One PATCH record per channel: Airtable rejects a batch that names the
+    # same record twice, which a channel with two findings (Instagram and
+    # TikTok, say) produced on 2026-09-26 and the whole fill was lost.
+    merged = {}
+    for u in updates:
+        merged.setdefault(u["id"], {"id": u["id"], "fields": {}})["fields"].update(u["fields"])
+    updates = list(merged.values())
     try:
         write(CHANNELS, "PATCH", updates)
     except SystemExit as exc:
@@ -253,6 +260,9 @@ if __name__ == "__main__":
         scheduled = "SB_MONTHLY_ONLY"
         os.environ["SB_ONLY"] = os.environ["SB_MONTHLY_ONLY"]
         os.environ.setdefault("SB_PLATFORMS", "instagram,tiktok")
+        # A refresh only needs the last few weeks; the archive pull costs
+        # up to three credits a profile, the default one.
+        os.environ["SB_HISTORY"] = "default"
     if scheduled:
         os.environ["SB_MODE"] = "run"
         print(f"Social Blade step scheduled by {scheduled}")
