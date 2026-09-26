@@ -49,6 +49,7 @@ CH = {
     "owned": "fldW9m4TaXzmdKByV",     # GF Owned Media
     "shows": "fld1XOCMyGXS6Zs03",     # Shows
     "status": "fldxFw8ogXiwLvFOa",    # Status
+    "proxy": "fldTaVwMUGYNYjvHA",     # Proxy Account: a firm's/host's account standing in for the show
     "photo": "fldKPVewyNpA0v9KV",     # Profile Photo
     "profiles": {
         "Instagram": "fldgJcSCvj5oBxYfC",
@@ -326,7 +327,7 @@ def build_snapshot() -> dict:
         "team": (TABLES["team"], _flatten(TE.values()), None),
         "clients": (TABLES["clients"], _flatten(CL.values()), None),
         "shows": (TABLES["shows"], _flatten(SH.values()), None),
-        "channels": (TABLES["channels"], _flatten([CH["name"], CH["owned"], CH["shows"], CH["status"], CH["photo"], CH["profiles"], CH["followers"]]), None),
+        "channels": (TABLES["channels"], _flatten([CH["name"], CH["owned"], CH["shows"], CH["status"], CH["proxy"], CH["photo"], CH["profiles"], CH["followers"]]), None),
         "videos": (TABLES["videos"], _flatten(VI.values()), None),
         "posts": (TABLES["posts"], _flatten(PO.values()), None),
         "followers": (TABLES["followers"], _flatten(FL.values()), None),
@@ -408,6 +409,7 @@ def build_snapshot() -> dict:
             "id": r["id"],
             "name": f.get(CH["name"]) or "?",
             "owned": bool(f.get(CH["owned"])),
+            "proxy": bool(f.get(CH["proxy"])),
             "shows": [s for s in (f.get(CH["shows"]) or []) if s in shows],
             "status": status.get("name") if isinstance(status, dict) else status,
             "photo": _thumb(f.get(CH["photo"])),
@@ -714,7 +716,7 @@ def fake_snapshot() -> dict:
         sid = f"vc{i}"
         shows.append({"id": sid, "name": n, "relationship": "Watchlist", "client": None, "logo": None, "default_miner_id": None,
                       "default_miner": None, "category": ["Venture Capital"], "youtube": None})
-        channels.append({"id": "ch" + sid, "name": n + " (official)", "owned": False, "shows": [sid], "status": "Benchmark",
+        channels.append({"id": "ch" + sid, "name": n + (" (firm)" if i == 4 else " (official)"), "owned": False, "shows": [sid], "status": "Benchmark", "proxy": i == 4,
                          "photo": None, "profiles": {"X": "https://x.com/x", "YouTube": "https://youtube.com/@x"},
                          "followers": {"X": rnd.randint(5000, 400000), "YouTube": rnd.randint(5000, 900000)}})
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",

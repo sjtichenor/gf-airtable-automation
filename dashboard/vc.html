@@ -65,6 +65,10 @@ td.show small{display:block;font-weight:400;color:var(--ink3);font-size:11px;mar
 td .r{display:inline-block;min-width:26px;color:var(--ink3);font-size:11px;margin-right:8px;text-align:right}
 td .r.top{color:var(--gold);font-weight:600}
 a.prof{border-bottom:1px dotted var(--line);padding-bottom:1px}
+.ast{color:var(--gold);font-weight:600;margin-left:2px;cursor:help;text-decoration:none;border-bottom:0}
+.legend{font-size:12px;color:var(--ink3);margin-top:10px}
+.legend .ast{cursor:default}
+.modal .acct .an .px{margin-left:8px;font-weight:600;color:var(--gold);letter-spacing:0;text-transform:none;font-size:11px}
 td.show a.name{cursor:pointer;border-bottom:1px dotted var(--line)}
 td.show a.name:hover{color:var(--accent);border-bottom-color:var(--accent)}
 /* Show detail pop-up: what we know about the show and where its accounts are. */
@@ -137,7 +141,8 @@ function render(){
           const link = r.links && r.links[p];
           if (r.counts[p] == null) return link ? `<td class="n dash"><a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile (no count yet)">—</a></td>` : '<td class="n dash">—</td>';
           const num = fmt(r.counts[p]);
-          return `<td class="n"><span class="r ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${link ? `<a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile">${num}</a>` : num}<span class="bar"><i style="width:${Math.max(2, 100*r.counts[p]/(max[p]||1)).toFixed(0)}%"></i></span></td>`;
+          const px = r.proxy && r.proxy[p] ? `<span class="ast" title="Not the show's own account: this is ${esc(r.proxy[p].replace(/ \((firm|official)\)$/, ''))}'s ${p}, standing in for the show. Apples to oranges next to a show's own account.">*</span>` : '';
+          return `<td class="n"><span class="r ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${link ? `<a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile">${num}</a>` : num}${px}<span class="bar"><i style="width:${Math.max(2, 100*r.counts[p]/(max[p]||1)).toFixed(0)}%"></i></span></td>`;
         }).join('')
       + `<td class="n">${r.pending?'<span class="dash" title="Accounts added; counts arrive with the next follower sync">awaiting sync</span>':`<b>${fmt(r.total)}</b>`}</td></tr>`).join('') + '</tbody>';
   $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (k === 'rank') return; sort = {k, d: sort.k===k ? -sort.d : (k==='name'?1:-1)}; render(); });
@@ -151,7 +156,8 @@ function render(){
   ].map(([l,v,s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   const asof = (D.generated_at||'').replace('T',' ').slice(0,16) + ' UTC';
   $('#asof').textContent = `Data as of ${asof}`;
-  $('#foot').innerHTML = `Counts are the Channels follower fields: X and YouTube refresh daily, other platforms as their syncs allow. Firm-run shows (YC, Sequoia, First Round, Lightspeed, Bessemer, Greylock, Village Global) are ranked on the firm's accounts. Rankings compiled by <span class="site">Good Future Media · goodfuturemedia.com</span>.`;
+  const nProxy = D.rows.filter(r => r.proxy && Object.keys(r.proxy).length).length;
+  $('#foot').innerHTML = (nProxy ? `<div class="legend"><span class="ast">*</span> A count marked with an asterisk comes from a firm's or host's account standing in for the show (Y Combinator for Lightcone, Sequoia for Crucible Moments, Stripe's Instagram for Cheeky Pint), not the show's own. Hover the asterisk to see whose. ${nProxy} show${nProxy===1?'':'s'} on this table have one.</div>` : '') + `Counts are the Channels follower fields: X and YouTube refresh daily, Instagram and TikTok monthly via Social Blade. Rankings compiled by <span class="site">Good Future Media · goodfuturemedia.com</span>.`;
   $('#meta').textContent = `${D.rows.length} shows` + (D.pending ? ` · ${D.pending} awaiting first sync` : '');
 }
 const ALL = ['YouTube', 'X', 'Instagram', 'TikTok', 'Facebook', 'Threads', 'LinkedIn'];
@@ -164,7 +170,7 @@ function openShow(id){
       const n = a.followers[p]; const url = a.profiles[p];
       return `<div class="plat"><span class="pn">${p}</span><span class="pu">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/^https?:\/\/(www\.)?/, ''))}</a>` : '<span>no profile listed</span>'}</span><span class="pc">${n != null ? fmt(n) : '<span class="dash">—</span>'}${r.rank && r.rank[p] && r.counts[p] === n ? `<small>#${r.rank[p]}</small>` : ''}</span></div>`;
     }).join('');
-    return `<div class="acct"><div class="an">${esc(a.name)}${a.status ? ` · ${esc(a.status)}` : ''}</div>${rows || '<div class="dash" style="font-size:12px">No profiles on this account yet.</div>'}</div>`;
+    return `<div class="acct"><div class="an">${esc(a.name)}${a.status ? ` · ${esc(a.status)}` : ''}${a.proxy ? '<span class="px">* stands in for the show</span>' : ''}</div>${rows || '<div class="dash" style="font-size:12px">No profiles on this account yet.</div>'}</div>`;
   }).join('');
   bg.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(r.name)}"><div class="mh">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : ''}<div><h3>${esc(r.name)}</h3><div class="meta">${[r.relationship, ...(r.category || [])].filter(Boolean).map(esc).join(' · ')}${r.rank?.total ? ` · #${r.rank.total} of ${D.ranked.total} overall` : ''}</div></div><button id="mClose" title="Close (Esc)">✕</button></div>${accts}<div class="ft">${r.youtube ? `<a href="${esc(r.youtube)}" target="_blank" rel="noopener">YouTube channel ↗</a>` : ''}<a href="https://airtable.com/appxCYu0Tfwc6h7X7/tblKMC5hDmmc7YsVW/${esc(r.id)}" target="_blank" rel="noopener">Show in Airtable ↗</a><span>Counts: the Channels follower fields; ranks as on the table.</span></div></div>`;
   bg.onclick = ev => { if (ev.target === bg) closeShow(); };

@@ -32,7 +32,7 @@ def table(snap: dict) -> dict:
         # account instead of @bg2pod.
         official = ([c for c in chans if c.get("status") == "Benchmark"]
                     or [c for c in chans if not c.get("owned")] or chans)
-        counts, links = {}, {}
+        counts, links, proxy = {}, {}, {}
         for p in PLATFORMS:
             # The count shown is the largest across the show's accounts; the
             # link goes to that same account's profile so a click confirms it.
@@ -46,6 +46,8 @@ def table(snap: dict) -> dict:
                 url = (best[1].get("profiles") or {}).get(p)
                 if url:
                     links[p] = url
+                if best[1].get("proxy"):
+                    proxy[p] = best[1]["name"]  # the count is a firm's/host's, not the show's own
             elif official:
                 url = next(((c.get("profiles") or {}).get(p) for c in official if (c.get("profiles") or {}).get(p)), None)
                 if url:
@@ -61,8 +63,8 @@ def table(snap: dict) -> dict:
             "ours": sh.get("relationship") in ("Client", "Owned"),
             "logo": sh.get("logo"),
             "accounts": [{"name": c["name"], "profiles": c.get("profiles") or {}, "followers": c.get("followers") or {},
-                          "status": c.get("status")} for c in official],
-            "counts": counts, "links": links, "total": sum(counts.values()),
+                          "status": c.get("status"), "proxy": bool(c.get("proxy"))} for c in official],
+            "counts": counts, "links": links, "proxy": proxy, "total": sum(counts.values()),
             "youtube": sh.get("youtube"),
             "category": sh.get("category") or [],
             "logo": sh.get("logo"),
