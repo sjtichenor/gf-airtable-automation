@@ -2,10 +2,11 @@
 VC podcast rankings: every show tagged "Venture Capital" in Shows, ranked by
 the following of its official accounts on each platform.
 
-Which channel counts for a show: the ones linked to it that are not GF
-Owned Media (our clip accounts would rank our own work, not the show). A
-show with only owned channels falls back to them, so Trading Places' own
-accounts still count. Per platform the largest count across those channels
+Which channel counts for a show: its own accounts (Channels rows with
+Status = Benchmark) when it has any; otherwise the linked channels not
+marked GF Owned Media; otherwise whatever is linked, so Trading Places'
+own accounts still count. Our clip accounts for a client show (bg2clips)
+would otherwise rank our work, not the show. Per platform the largest count across those channels
 is used, so a show with two accounts on X is not double-counted.
 """
 PLATFORMS = ["YouTube", "X", "Instagram", "TikTok", "Facebook", "Threads"]
@@ -24,7 +25,12 @@ def table(snap: dict) -> dict:
         if TAG not in (sh.get("category") or []):
             continue
         chans = by_show.get(sh["id"], [])
-        official = [c for c in chans if not c.get("owned")] or chans
+        # The show's own accounts (Status = Benchmark) beat everything else;
+        # otherwise any channel not marked GF Owned Media; otherwise whatever
+        # is linked. Without the first rule BG2 ranked on our bg2clips
+        # account instead of @bg2pod.
+        official = ([c for c in chans if c.get("status") == "Benchmark"]
+                    or [c for c in chans if not c.get("owned")] or chans)
         counts = {}
         for p in PLATFORMS:
             vals = [c["followers"][p] for c in official if isinstance((c.get("followers") or {}).get(p), (int, float))]

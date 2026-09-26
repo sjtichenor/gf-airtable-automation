@@ -84,8 +84,22 @@ html[data-theme=dark] .badge.client{color:#3fc3ae}
 .badge.suggest{background:var(--chip);color:var(--text)}
 .group.client .ghead h2 .sw{background:#0b7a6e}
 .group.client .ghead .note{color:var(--muted);font-size:12.5px;margin-left:auto}
-.assign{display:flex;gap:6px;align-items:center;flex-basis:100%;min-width:0}
-.assign select{flex:1;min-width:0;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12.5px}
+/* Assign popover: anchored under the button, directors first, one click assigns. */
+.pop{position:fixed;z-index:60;width:264px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);overflow:hidden;animation:pop .12s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.pop input{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);padding:10px 12px;font:inherit;font-size:13px;outline:none}
+.pop .grp{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);padding:8px 12px 2px}
+.pop .list{max-height:280px;overflow:auto;padding-bottom:6px}
+.pop .p{display:flex;align-items:center;gap:10px;padding:7px 12px;cursor:pointer;font-size:13px}
+.pop .p:hover,.pop .p.hi{background:var(--chip)}
+.pop .p .av{width:26px;height:26px;border-radius:50%;background:var(--chip);color:var(--muted);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
+.pop .p .av img{width:100%;height:100%;object-fit:cover}
+.pop .p .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pop .p .tag{font-size:10px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);padding:2px 6px;border-radius:999px}
+.pop .p.cur .nm::after{content:" · assigned";color:var(--muted);font-weight:400}
+.pop .none{padding:12px;color:var(--muted);font-size:12px}
+.pop .ft{border-top:1px solid var(--border);padding:6px 12px;font-size:11px;color:var(--muted2)}
+.btn.assign-btn::after{content:"";display:inline-block;width:5px;height:5px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-1px,-1px);margin-left:7px;opacity:.7}
 .hide-btn{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;line-height:22px;padding:0;opacity:.55}
 .card:hover .hide-btn{opacity:1}
 .hide-btn:hover{background:var(--chip);border-color:var(--border);color:var(--text)}
@@ -354,7 +368,7 @@ function actions(e, inDrawer){
     b.push(`<button class="btn primary" data-act="claim" ${state.who ? '' : 'title="Pick your name first"'}>Claim</button>`);
   }
   if (canAssign() && e.status !== 'Mined') {
-    b.push(`<button class="btn" data-act="assign" title="Hand this episode to someone">${isTaken(e) ? 'Reassign…' : 'Assign…'}</button>`);
+    b.push(`<button class="btn assign-btn" data-act="assign" title="Hand this episode to someone">${isTaken(e) ? 'Reassign' : 'Assign'}</button>`);
     if (isTaken(e) && !isMine(e)) b.push(`<button class="btn" data-act="release" title="Take it off ${esc(e.miner)} and put it back">Unassign</button>`);
   }
   if (inDrawer && e.yt) b.push(`<a class="btn" href="${esc(e.yt)}" target="_blank" rel="noopener">YouTube ↗</a>`);
@@ -372,17 +386,46 @@ function wireActions(root, e){
 }
 // Execs pick a person inline; directors first, then everyone else, the
 // show's usual miner preselected.
+let POP = null;
+function closePop(){ if (POP) { POP.el.remove(); document.removeEventListener('keydown', POP.onKey); document.removeEventListener('mousedown', POP.onDown, true); window.removeEventListener('scroll', POP.place, true); POP = null; } }
 function openAssign(e, btn){
-  if (btn.parentElement.querySelector('.assign')) return;
-  const dirs = TEAM.filter(t => (t.roles||[]).includes('Director')), rest = TEAM.filter(t => !(t.roles||[]).includes('Director'));
-  const opt = t => `<option value="${esc(t.id)}" ${t.id === (e.suggested_id || e.miner_id) ? 'selected' : ''}>${esc(t.name)}</option>`;
-  const wrap = document.createElement('span'); wrap.className = 'assign';
-  wrap.innerHTML = `<select><optgroup label="Directors">${dirs.map(opt).join('')}</optgroup><optgroup label="Everyone else">${rest.map(opt).join('')}</optgroup></select><button class="btn primary">Assign</button><button class="btn">×</button>`;
-  const [go, cancel] = wrap.querySelectorAll('button');
-  go.onclick = ev => { ev.stopPropagation(); doAction(e, 'assign', go, wrap.querySelector('select').value); };
-  cancel.onclick = ev => { ev.stopPropagation(); wrap.remove(); btn.hidden = false; };
-  wrap.onclick = ev => ev.stopPropagation();
-  btn.hidden = true; btn.after(wrap);
+  if (POP && POP.for === e.id) { closePop(); return; }
+  closePop();
+  const initials = n => n.split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+  const usual = e.suggested_id || null, current = e.miner_id || null;
+  const dirs = TEAM.filter(t => (t.roles || []).includes('Director')), rest = TEAM.filter(t => !(t.roles || []).includes('Director'));
+  const el = document.createElement('div'); el.className = 'pop'; el.setAttribute('role', 'listbox');
+  el.innerHTML = `<input type="search" placeholder="Assign to…" aria-label="Search people"><div class="list"></div><div class="ft">↑↓ to move · Enter to assign · Esc to close</div>`;
+  const input = el.querySelector('input'), list = el.querySelector('.list');
+  let hi = 0, rows = [];
+  const row = t => `<div class="p ${t.id === current ? 'cur' : ''}" data-id="${esc(t.id)}"><span class="av">${t.photo ? `<img src="${esc(t.photo)}" alt="">` : esc(initials(t.name))}</span><span class="nm">${esc(t.name)}</span>${t.id === usual ? '<span class="tag">usual</span>' : ''}</div>`;
+  const draw = () => {
+    const q = input.value.trim().toLowerCase(), f = t => !q || t.name.toLowerCase().includes(q);
+    const d = dirs.filter(f), r = rest.filter(f);
+    // The usual miner first, so Enter with no typing assigns the obvious person.
+    d.sort((a, b) => (b.id === usual) - (a.id === usual) || a.name.localeCompare(b.name));
+    list.innerHTML = (d.length ? `<div class="grp">Directors</div>${d.map(row).join('')}` : '') + (r.length ? `<div class="grp">Everyone else</div>${r.map(row).join('')}` : '') || '<div class="none">Nobody matches.</div>';
+    rows = [...list.querySelectorAll('.p')]; hi = Math.min(hi, Math.max(rows.length - 1, 0)); mark();
+    rows.forEach((p, i) => { p.onmouseenter = () => { hi = i; mark(); }; p.onclick = ev => { ev.stopPropagation(); pick(p.dataset.id); }; });
+  };
+  const mark = () => rows.forEach((p, i) => p.classList.toggle('hi', i === hi));
+  const pick = id => { const who = TEAM.find(t => t.id === id); closePop(); doAction(e, 'assign', btn, id); if (who) btn.textContent = `Assigning ${who.name.split(' ')[0]}…`; };
+  const place = () => { const r = btn.getBoundingClientRect(); const w = 264, h = el.offsetHeight || 320;
+    let x = Math.min(r.left, window.innerWidth - w - 8), y = r.bottom + 6; if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+    el.style.left = x + 'px'; el.style.top = y + 'px'; };
+  const onKey = ev => {
+    if (ev.key === 'Escape') { closePop(); btn.focus(); }
+    else if (ev.key === 'ArrowDown') { ev.preventDefault(); hi = Math.min(hi + 1, rows.length - 1); mark(); rows[hi]?.scrollIntoView({block: 'nearest'}); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); hi = Math.max(hi - 1, 0); mark(); rows[hi]?.scrollIntoView({block: 'nearest'}); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); if (rows[hi]) pick(rows[hi].dataset.id); }
+  };
+  const onDown = ev => { if (!el.contains(ev.target) && ev.target !== btn) closePop(); };
+  input.oninput = () => { hi = 0; draw(); };
+  el.onclick = ev => ev.stopPropagation();
+  document.body.appendChild(el); draw(); place();
+  document.addEventListener('keydown', onKey); document.addEventListener('mousedown', onDown, true); window.addEventListener('scroll', place, true);
+  POP = {el, for: e.id, onKey, onDown, place};
+  input.focus();
 }
 async function doAction(e, act, btn, who){
   if ((act === 'claim' || act === 'start') && !state.who) { toast('Pick your name at the top first.'); $('#who').focus(); return; }
