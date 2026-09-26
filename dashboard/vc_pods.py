@@ -60,9 +60,12 @@ def table(snap: dict) -> dict:
             "id": sh["id"], "name": sh["name"], "relationship": sh.get("relationship"),
             "ours": sh.get("relationship") in ("Client", "Owned"),
             "logo": sh.get("logo"),
-            "accounts": [{"name": c["name"], "profiles": c.get("profiles") or {}} for c in official],
+            "accounts": [{"name": c["name"], "profiles": c.get("profiles") or {}, "followers": c.get("followers") or {},
+                          "status": c.get("status")} for c in official],
             "counts": counts, "links": links, "total": sum(counts.values()),
             "youtube": sh.get("youtube"),
+            "category": sh.get("category") or [],
+            "logo": sh.get("logo"),
         })
     # Ranks per platform and overall; ties share a rank.
     ranks = {}

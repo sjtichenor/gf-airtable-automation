@@ -65,6 +65,27 @@ td.show small{display:block;font-weight:400;color:var(--ink3);font-size:11px;mar
 td .r{display:inline-block;min-width:26px;color:var(--ink3);font-size:11px;margin-right:8px;text-align:right}
 td .r.top{color:var(--gold);font-weight:600}
 a.prof{border-bottom:1px dotted var(--line);padding-bottom:1px}
+td.show a.name{cursor:pointer;border-bottom:1px dotted var(--line)}
+td.show a.name:hover{color:var(--accent);border-bottom-color:var(--accent)}
+/* Show detail pop-up: what we know about the show and where its accounts are. */
+.modal-bg{position:fixed;inset:0;background:rgba(20,20,20,.45);display:flex;align-items:center;justify-content:center;z-index:60;padding:20px}
+.modal{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;width:min(560px,100%);max-height:85vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal .mh{display:flex;align-items:flex-start;gap:14px;padding:18px 20px 14px;border-bottom:1px solid var(--line)}
+.modal .mh img{width:48px;height:48px;border-radius:8px;object-fit:cover;flex:none;border:1px solid var(--line)}
+.modal .mh h3{margin:0;font-size:18px;font-weight:600;letter-spacing:-.01em}
+.modal .mh .meta{font-size:12px;color:var(--ink3);margin-top:3px}
+.modal .mh button{margin-left:auto;background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--ink2);cursor:pointer;font:inherit;padding:4px 9px}
+.modal .acct{padding:12px 20px;border-bottom:1px solid var(--line2)}
+.modal .acct .an{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px}
+.modal .plat{display:grid;grid-template-columns:110px 1fr auto;gap:8px 12px;align-items:center;padding:6px 0;border-top:1px solid var(--line2);font-size:13px}
+.modal .plat:first-of-type{border-top:0}
+.modal .plat .pn{font-weight:500}
+.modal .plat .pu{color:var(--ink3);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal .plat .pu a{color:var(--accent)}
+.modal .plat .pc{font-variant-numeric:tabular-nums;text-align:right}
+.modal .plat .pc small{color:var(--ink3);margin-left:6px}
+.modal .ft{padding:12px 20px;font-size:12px;color:var(--ink3);display:flex;gap:14px;flex-wrap:wrap}
+.modal .ft a{color:var(--accent)}
 a.prof:hover{color:var(--accent);border-bottom-color:var(--accent)}
 td .bar{display:inline-block;height:4px;border-radius:2px;background:var(--line);vertical-align:middle;margin-left:10px;width:72px;position:relative;overflow:hidden}
 td .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ink);opacity:.55}
@@ -111,7 +132,7 @@ function render(){
   const max = {}; D.platforms.forEach(p => max[p] = Math.max(...D.rows.map(r => r.counts[p] || 0)));
   const cols = [['rank','#'], ['name','Show'], ...D.platforms.map(p => [p, p]), ['total','Total']];
   $('#t').innerHTML = '<thead><tr>' + cols.map(([k,l]) => `<th class="${k==='name'||k==='rank'?'':'n'}" data-k="${k}">${l}${sort.k===k?(sort.d<0?' ↓':' ↑'):''}</th>`).join('') + '</tr></thead><tbody>'
-    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}${r.pending?' pending':''}"><td class="rank">${r.pending?'—':i+1}</td><td class="show">${r.youtube ? `<a class="prof" href="${esc(r.youtube)}" target="_blank" rel="noopener" title="Open the show's YouTube channel">${esc(r.name)}</a>` : esc(r.name)}${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
+    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}${r.pending?' pending':''}"><td class="rank">${r.pending?'—':i+1}</td><td class="show"><a class="name" data-show="${esc(r.id)}" title="Show details">${esc(r.name)}</a>${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
       + D.platforms.map(p => {
           const link = r.links && r.links[p];
           if (r.counts[p] == null) return link ? `<td class="n dash"><a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile (no count yet)">—</a></td>` : '<td class="n dash">—</td>';
@@ -120,6 +141,7 @@ function render(){
         }).join('')
       + `<td class="n">${r.pending?'<span class="dash" title="Accounts added; counts arrive with the next follower sync">awaiting sync</span>':`<b>${fmt(r.total)}</b>`}</td></tr>`).join('') + '</tbody>';
   $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (k === 'rank') return; sort = {k, d: sort.k===k ? -sort.d : (k==='name'?1:-1)}; render(); });
+  $('#t').querySelectorAll('a.name').forEach(a => a.onclick = ev => { ev.preventDefault(); openShow(a.dataset.show); });
   const ours = D.rows.filter(r => r.ours);
   const leader = D.rows[0];
   $('#kpis').innerHTML = [
@@ -132,6 +154,26 @@ function render(){
   $('#foot').innerHTML = `Counts are the Channels follower fields: X and YouTube refresh daily, other platforms as their syncs allow. Firm-run shows (YC, Sequoia, First Round, Lightspeed, Bessemer, Greylock, Village Global) are ranked on the firm's accounts. Rankings compiled by <span class="site">Good Future Media · goodfuturemedia.com</span>.`;
   $('#meta').textContent = `${D.rows.length} shows` + (D.pending ? ` · ${D.pending} awaiting first sync` : '');
 }
+const ALL = ['YouTube', 'X', 'Instagram', 'TikTok', 'Facebook', 'Threads', 'LinkedIn'];
+function openShow(id){
+  const r = D.rows.find(x => x.id === id); if (!r) return;
+  closeShow();
+  const bg = document.createElement('div'); bg.className = 'modal-bg'; bg.id = 'showModal';
+  const accts = r.accounts.map(a => {
+    const rows = ALL.filter(p => a.profiles[p] || a.followers[p] != null).map(p => {
+      const n = a.followers[p]; const url = a.profiles[p];
+      return `<div class="plat"><span class="pn">${p}</span><span class="pu">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/^https?:\/\/(www\.)?/, ''))}</a>` : '<span>no profile listed</span>'}</span><span class="pc">${n != null ? fmt(n) : '<span class="dash">—</span>'}${r.rank && r.rank[p] && r.counts[p] === n ? `<small>#${r.rank[p]}</small>` : ''}</span></div>`;
+    }).join('');
+    return `<div class="acct"><div class="an">${esc(a.name)}${a.status ? ` · ${esc(a.status)}` : ''}</div>${rows || '<div class="dash" style="font-size:12px">No profiles on this account yet.</div>'}</div>`;
+  }).join('');
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(r.name)}"><div class="mh">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : ''}<div><h3>${esc(r.name)}</h3><div class="meta">${[r.relationship, ...(r.category || [])].filter(Boolean).map(esc).join(' · ')}${r.rank?.total ? ` · #${r.rank.total} of ${D.ranked.total} overall` : ''}</div></div><button id="mClose" title="Close (Esc)">✕</button></div>${accts}<div class="ft">${r.youtube ? `<a href="${esc(r.youtube)}" target="_blank" rel="noopener">YouTube channel ↗</a>` : ''}<a href="https://airtable.com/appxCYu0Tfwc6h7X7/tblKMC5hDmmc7YsVW/${esc(r.id)}" target="_blank" rel="noopener">Show in Airtable ↗</a><span>Counts: the Channels follower fields; ranks as on the table.</span></div></div>`;
+  bg.onclick = ev => { if (ev.target === bg) closeShow(); };
+  document.body.appendChild(bg);
+  $('#mClose').onclick = closeShow;
+  document.addEventListener('keydown', escClose);
+}
+function escClose(ev){ if (ev.key === 'Escape') closeShow(); }
+function closeShow(){ const m = $('#showModal'); if (m) m.remove(); document.removeEventListener('keydown', escClose); }
 fetch('/dashboard/api/vc', {credentials:'same-origin'}).then(r => r.json()).then(d => { D = d; if (!d.rows) throw 0; render(); }).catch(() => { $('#t').innerHTML = '<tr><td class="empty">Nothing to rank yet — counts arrive after the next follower sync.</td></tr>'; });
 })();
 </script>
