@@ -9,7 +9,8 @@ own accounts still count. Our clip accounts for a client show (bg2clips)
 would otherwise rank our work, not the show. Per platform the largest count across those channels
 is used, so a show with two accounts on X is not double-counted.
 """
-PLATFORMS = ["YouTube", "X", "Instagram", "TikTok", "Facebook", "Threads"]
+# Facebook and Threads are not where podcasts compete; Spencer dropped them from the page (2026-09-26).
+PLATFORMS = ["YouTube", "X", "Instagram", "TikTok"]
 TAG = "Venture Capital"
 
 
