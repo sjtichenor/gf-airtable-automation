@@ -414,6 +414,23 @@ def api_source_shows_sync(request: Request, dry: int = 0, limit: int = 0):
         return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
 
 
+@router.get("/api/source-shows/preview")
+def api_source_shows_preview(request: Request, limit: int = 30):
+    """Dry run as a link: what the next pass would write, nothing written. Admins only."""
+    session = auth.is_authed(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized; sign in to the dashboard first"}, status_code=401)
+    if not auth.is_admin(session):
+        return JSONResponse({"error": "admins only"}, status_code=403)
+    from videos import source_show
+    if not source_show.configured():
+        return JSONResponse({"error": "ANTHROPIC_API_KEY not set on gf-api yet"}, status_code=503)
+    try:
+        return JSONResponse(source_show.sync(dry_run=True, limit=max(1, min(limit, 100))))
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
 @router.get("/api/source-shows/status")
 def api_source_shows_status(request: Request):
     if not auth.is_authed(request):
