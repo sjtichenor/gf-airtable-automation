@@ -95,12 +95,14 @@ def client_ids(token):
             if (c["fields"].get(F_CLIENT_NAME) or "").strip().lower() in want}
 
 
-def list_candidates(token):
-    """Videos of the covered clients with no Source Show and no Full Episode."""
+def list_candidates(token, retry_unknown=False):
+    """Videos of the covered clients with no Source Show and no Full Episode.
+    retry_unknown also takes the ones marked Unknown (after the evidence got better)."""
     ids = client_ids(token)
     if not ids:
         return []
-    recs = _get(token, {"filterByFormula": 'AND({Source Show} = "", {Client Account} != "", {Full Episode} = "")',
+    blank = 'OR({Source Show} = "", {Source Show} = "Unknown")' if retry_unknown else '{Source Show} = ""'
+    recs = _get(token, {"filterByFormula": f'AND({blank}, {{Client Account}} != "", {{Full Episode}} = "")',
                         "fields[]": [F["title"], F["client"], F["yt_title"], F["tweet"], F["yt_desc"], F["tt_desc"], F["hashtags"], F["notes"], F["ai_notes"]]})
     return [r for r in recs if any(x in ids for x in (r["fields"].get(F["client"]) or []))]
 
@@ -124,11 +126,16 @@ def evidence(rec):
     # is repeated across the tweet and both descriptions; take it wherever it is.
     copy = "\n".join((f.get(k) or "") for k in (F["tweet"], F["yt_desc"], F["tt_desc"]))
     tweet = (f.get(F["tweet"]) or f.get(F["yt_desc"]) or "").strip()
+    # The sign-off ("-- Lily Liu, President of the Solana Foundation on Squawk
+    # Box Europe") is the line that names the show. Take dash-led lines and
+    # anything with an "on @handle" / "on the X podcast" shape.
     attrib = []
     for ln in copy.splitlines():
         ln = ln.strip()
-        if ln and ln not in attrib and re.search(r"\bon (the )?@|\bon the .{2,40}(pod|podcast|show)\b|podcast", ln, re.I):
+        if ln and ln not in attrib and (ln[0] in "—–-" or re.search(r"\bon (the )?@|\bon (the )?[A-Z][\w.&' ]{2,40}(pod|podcast|show|tv)\b|podcast", ln, re.I)):
             attrib.append(ln)
+    src_url = src.group(1).rstrip(">") if src else None
+    video = youtube_info(src_url) if src_url else None
     return {
         "id": rec["id"],
         "title": (f.get(F["title"]) or "").strip(),
@@ -136,14 +143,37 @@ def evidence(rec):
         "attribution": attrib[:3] or None,
         "tweet_start": tweet[:160] if tweet and not attrib else None,
         "hashtags": (f.get(F["hashtags"]) or "").strip() or None,
-        "source_url": src.group(1).rstrip(">") if src else None,
+        "source_url": src_url,
+        "source_video": video,  # {"title", "channel"} from YouTube, when the SOURCE is a YouTube link
         "research": ai or None,
     }
 
 
+_yt_cache = {}
+
+
+def youtube_info(url):
+    """Title and channel of a YouTube link via the public oEmbed endpoint (no
+    key). The channel name is the single best clue to the show."""
+    if not re.search(r"(youtube\.com|youtu\.be)/", url or ""):
+        return None
+    if url in _yt_cache:
+        return _yt_cache[url]
+    info = None
+    try:
+        r = requests.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"}, timeout=15)
+        if r.status_code == 200:
+            j = r.json()
+            info = {"title": j.get("title"), "channel": j.get("author_name")}
+    except requests.RequestException:
+        pass
+    _yt_cache[url] = info
+    return info
+
+
 PROMPT = """You label short clips with the podcast, show, conference talk or interview they were cut from.
 
-For each video below, use its evidence (title, YouTube title, tweet attribution lines, hashtags, source URL, the copywriter's research notes) to name the ORIGINAL show or event the clip came from -- not the client, not the speaker, not the account it was posted to.
+For each video below, use its evidence (title, YouTube title, the sign-off/attribution lines from its copy, hashtags, the source URL and -- when present -- the source video's YouTube title and channel, the copywriter's research notes) to name the ORIGINAL show or event the clip came from -- not the client, not the speaker, not the account it was posted to. A source_video channel is the strongest clue: "The Peel with Turner Novak" is the show "The Peel"; a TV segment names the programme ("Squawk Box", "Bloomberg Crypto").
 
 Rules:
 - Give the show's proper name, not a handle: "The Peel", "PokerNews Podcast", "Lightspeed", "Solana Breakpoint 2026", "Bloomberg Crypto". A handle is only a hint (@ThePeelPod -> The Peel).
@@ -188,9 +218,9 @@ def configured():
     return bool(os.environ.get("ANTHROPIC_API_KEY") and os.environ.get("AIRTABLE_PERSONAL_ACCESS_TOKEN"))
 
 
-def sync(dry_run=False, limit=None):
+def sync(dry_run=False, limit=None, retry_unknown=False):
     token, key = os.environ["AIRTABLE_PERSONAL_ACCESS_TOKEN"], os.environ["ANTHROPIC_API_KEY"]
-    cands = list_candidates(token)
+    cands = list_candidates(token, retry_unknown)
     if limit:
         cands = cands[:limit]
     known = known_shows(token)
@@ -243,9 +273,13 @@ last = {"summary": None, "error": None}
 
 def _loop(seconds):
     time.sleep(300)
+    # SOURCE_SHOW_RETRY_UNKNOWN=1: the first pass after boot re-asks the
+    # Unknowns (set it after the evidence improves, then unset it).
+    retry = os.environ.get("SOURCE_SHOW_RETRY_UNKNOWN") == "1"
     while True:
         try:
-            last["summary"], last["error"] = sync(), None
+            last["summary"], last["error"] = sync(retry_unknown=retry), None
+            retry = False
         except Exception as e:
             last["error"] = f"{type(e).__name__}: {e}"
             log.exception("source show failed")
