@@ -450,6 +450,44 @@ def api_source_shows_preview(request: Request, limit: int = 30):
         return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
 
 
+@router.post("/api/link-episodes/sync")
+def api_link_episodes_sync(request: Request, dry: int = 0, limit: int = 0):
+    """Link clips to Full Episodes now. Admins only; ?dry=1 plans without writing."""
+    session = auth.is_authed(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not auth.is_admin(session):
+        return JSONResponse({"error": "admins only"}, status_code=403)
+    from videos import link_episodes
+    try:
+        return JSONResponse(link_episodes.sync(dry_run=bool(dry), limit=limit or None))
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
+@router.get("/api/link-episodes/preview")
+def api_link_episodes_preview(request: Request, limit: int = 100):
+    """The same plan as a link to open signed in: what would be linked and why the rest was not."""
+    session = auth.is_authed(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized; sign in to the dashboard first"}, status_code=401)
+    if not auth.is_admin(session):
+        return JSONResponse({"error": "admins only"}, status_code=403)
+    from videos import link_episodes
+    try:
+        return JSONResponse(link_episodes.sync(dry_run=True, limit=max(1, min(limit, 500))))
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
+@router.get("/api/link-episodes/status")
+def api_link_episodes_status(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    from videos import link_episodes
+    return JSONResponse({"configured": link_episodes.configured(), **link_episodes.last})
+
+
 @router.get("/api/source-shows/status")
 def api_source_shows_status(request: Request):
     if not auth.is_authed(request):

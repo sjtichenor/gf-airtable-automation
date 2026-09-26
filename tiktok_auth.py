@@ -118,6 +118,9 @@ def _warm_dashboard() -> None:
     # Source Show on Videos (which podcast a client's clip was cut from), hourly.
     from videos.source_show import start_background as start_source_show
     start_source_show()
+    # Link clips to the Full Episode they came from, once their Source Show is a real Show. Hourly.
+    from videos.link_episodes import start_background as start_link_episodes
+    start_link_episodes()
 
 
 def missing_config() -> List[str]:
