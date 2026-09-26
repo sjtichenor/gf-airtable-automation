@@ -340,6 +340,31 @@ def api_team_months_status(request: Request):
     return JSONResponse({"configured": team_months.configured(), **team_months.last})
 
 
+@router.post("/api/x-followers/sync")
+def api_x_followers_sync(request: Request, dry: int = 0):
+    """Refresh X follower counts on Channels now. Admins only."""
+    session = auth.is_authed(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not auth.is_admin(session):
+        return JSONResponse({"error": "admins only"}, status_code=403)
+    from followers import x_followers
+    if not x_followers.configured():
+        return JSONResponse({"error": "TWITTER_BEARER_TOKEN not set"}, status_code=503)
+    try:
+        return JSONResponse(x_followers.sync(dry_run=bool(dry)))
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
+@router.get("/api/x-followers/status")
+def api_x_followers_status(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    from followers import x_followers
+    return JSONResponse({"configured": x_followers.configured(), **x_followers.last})
+
+
 @router.get("/api/stripe/status")
 def api_stripe_status(request: Request):
     if not auth.is_authed(request):

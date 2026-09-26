@@ -109,6 +109,9 @@ def _warm_dashboard() -> None:
     from dashboard.data import cache as dashboard_cache
     from invoicing.team_months import start_background as start_team_months
     start_team_months(lambda: dashboard_cache.snapshot)
+    # X follower counts for every channel with a Twitter Profile, daily.
+    from followers.x_followers import start_background as start_x_followers
+    start_x_followers()
 
 
 def missing_config() -> List[str]:
