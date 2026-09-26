@@ -58,6 +58,12 @@ h2.grp{display:flex;align-items:baseline;gap:10px}h2.grp span{font-weight:400;co
 .heat .c.future{opacity:.25}
 .months{display:flex;font-size:10px;color:var(--muted2);margin-bottom:4px;height:12px;position:relative}
 .wip{margin-top:10px;font-size:12px;color:var(--muted)}
+.health{border:1px solid color-mix(in srgb,var(--down) 35%,var(--border));background:color-mix(in srgb,var(--down) 6%,var(--card));border-radius:14px;padding:12px 16px;margin-bottom:18px;font-size:13px}
+.health h3{margin:0 0 6px;font-size:13px;color:var(--down)}
+.health ul{margin:0;padding-left:18px}
+.health .look{color:var(--muted);font-size:12px;margin-top:6px}
+.health.ok{border-color:color-mix(in srgb,var(--up) 35%,var(--border));background:color-mix(in srgb,var(--up) 6%,var(--card))}
+.health.ok h3{color:var(--up)}
 .wip b{color:var(--text);font-weight:600}
 .ev{display:grid;grid-template-columns:52px 130px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:baseline}
 .ev .t{color:var(--muted);font-variant-numeric:tabular-nums}
@@ -103,7 +109,8 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
     <label class="toggle">Day <input type="date" id="fDay"></label>
   </div>
 
-  <div id="people"></div>
+  <div id="health" hidden></div>
+<div id="people"></div>
 
   <h2 id="dayTitle">Day detail</h2>
   <div class="card span12" id="day"></div>
@@ -158,6 +165,15 @@ $('#fClass').onchange = e => { state.klass = e.target.value; if (state.klass) st
 $('#fOthers').onchange = e => { state.others = e.target.checked; render(); };
 $('#fDay').onchange = e => { state.day = e.target.value; render(); };
 
+// Follower data health: the same audit the 09:00 UTC cron runs, shown where
+// someone will actually see it. Quiet unless something needs a hand.
+fetch('/dashboard/api/health', {credentials:'same-origin'}).then(r => r.ok ? r.json() : null).then(h => {
+  if (!h) return; const el = $('#health');
+  if (!h.act.length) { el.className = 'health ok'; el.innerHTML = `<h3>Follower data: every active account is updating</h3>${h.look.length ? `<div class="look">${h.look.length} minor thing${h.look.length===1?'':'s'} to look at: ${h.look.slice(0,4).map(x=>esc(x.channel+' / '+x.platform+' ('+x.check+')')).join(', ')}${h.look.length>4?', …':''}</div>` : ''}`; el.hidden = false; return; }
+  el.className = 'health';
+  el.innerHTML = `<h3>Follower data needs a hand — ${h.act.length} account${h.act.length===1?'':'s'} not updating</h3><ul>${h.act.map(x=>`<li><b>${esc(x.channel)} / ${esc(x.platform)}</b>: ${esc(x.check)} — ${esc(x.detail)}</li>`).join('')}</ul>${h.look.length?`<div class="look">${h.look.length} minor to look at (blank fields with a Social Blade row behind them fill themselves at 09:00 UTC).</div>`:''}`;
+  el.hidden = false;
+}).catch(()=>{});
 function people(){
   return A.people.filter(p => (state.others || p.in_team) && (!state.team || p.team===state.team) && (!state.role || p.group===state.role) && (!state.klass || p.bootcamp_class===state.klass));
 }

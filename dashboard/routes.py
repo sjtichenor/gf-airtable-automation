@@ -284,6 +284,18 @@ def person_page(request: Request, team_id: str):
     return HTMLResponse(_read("person.html"))
 
 
+@router.get("/api/health")
+def api_health(request: Request):
+    """Follower data-health findings, the same audit the snapshot cron runs."""
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    snap = cache.snapshot
+    if snap is None:
+        return JSONResponse({"error": "warming up", **cache.status()}, status_code=503, headers={"Retry-After": "5"})
+    from . import health_view
+    return JSONResponse(health_view.summary(snap), headers={"Cache-Control": "private, max-age=300"})
+
+
 @router.get("/api/person/{team_id}")
 def api_person(request: Request, team_id: str):
     if not auth.is_authed(request):

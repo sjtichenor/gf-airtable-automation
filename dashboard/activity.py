@@ -372,6 +372,20 @@ def digest(snap: dict, day_from, day_to=None) -> dict:
     if quiet_lines:
         sections.append(("No activity", quiet_lines))
     sections.append(("Pipeline now", [pipe or "empty"] + ([f"Stuck: " + "; ".join(s for _, s in stuck[:6])] if stuck else [])))
+    # Follower data health: the audit the snapshot cron runs, surfaced where
+    # people read. Only when something needs a hand; a clean day says nothing.
+    try:
+        from . import health_view
+        h = health_view.summary(snap)
+        if h["act"]:
+            lines = [f"{x['channel']} / {x['platform']}: {x['check']} — {x['detail']}" for x in h["act"][:8]]
+            if len(h["act"]) > 8:
+                lines.append(f"+{len(h['act']) - 8} more")
+            if h["look"]:
+                lines.append(f"({len(h['look'])} minor to look at on the Team page)")
+            sections.append(("Data health — needs a hand", lines))
+    except Exception:  # never let the audit break the digest
+        pass
 
     text = title + "\n\n" + "\n\n".join(f"{h}\n" + "\n".join(lines) for h, lines in sections)
     blocks = [{"type": "header", "text": {"type": "plain_text", "text": title}}]

@@ -27,11 +27,13 @@ from datetime import date, timedelta
 
 PLATFORMS = ("Instagram", "TikTok", "YouTube", "Facebook", "X", "Threads")
 
-# Only the platforms the daily Social Blade backfill covers get a NO ROW
-# check on their logs. X and Threads reach the logs only through the
-# Channels fields, so an X count with no field is reported as NO FIELD, not
-# as a missing row.
-LOGGED_DAILY = {"Instagram", "TikTok", "YouTube", "Facebook"}
+# Platforms something writes every day get a NO ROW check on their logs.
+# Threads is manual, so a Threads count with no field is reported as NO
+# FIELD, not as a missing row.
+# X joined the list on 2026-09-26 when followers/x_followers.py started
+# writing it daily -- before that, an X account with no rows was invisible
+# here, which is how four accounts went months without a count.
+LOGGED_DAILY = {"Instagram", "TikTok", "YouTube", "Facebook", "X"}
 
 
 def audit(channels, logs, today=None, stale_days=2, flat_days=3, flat_min=100, diverge_pct=5.0, ignore=()):

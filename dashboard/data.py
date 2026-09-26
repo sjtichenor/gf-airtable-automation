@@ -122,6 +122,7 @@ FL = {
     "date": "fld1JmpcbEVXEL3f5",      # Date
     "count": "flddzOdphxZnvDKDZ",     # Follower Count
     "prev": "fldT0GzajOXGarc4T",      # Previous Count
+    "notes": "fldzZQzMg6XvKlltN",     # Notes ("Social Blade backfill" marks an independent row)
 }
 DM = {
     "channel": "flddkaLHNlpAowbny",   # Social Media Account
@@ -484,6 +485,10 @@ def build_snapshot() -> dict:
             "date": f.get(FL["date"]),
             "count": f.get(FL["count"]),
             "prev": f.get(FL["prev"]),
+            # Rows Social Blade wrote can contradict the Channels field; rows
+            # the snapshot copied out of that field cannot. The health audit
+            # needs to know which is which.
+            "independent": (f.get(FL["notes"]) or "").startswith("Social Blade"),
         })
 
     # Status history: only the recent window plus anything still open. The
