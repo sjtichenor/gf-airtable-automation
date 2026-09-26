@@ -36,6 +36,10 @@ def name_matches(first, last, x_name):
     if not x_name:
         return True
     xn = _fold(x_name)
+    # An emoji-only display name (Hunter Walk's is a laptop and a coffee)
+    # says nothing either way; only a *different* name is a warning.
+    if not xn.strip():
+        return True
     xn_words = set(xn.split())
     for part in (first, last):
         p = _fold(part).replace(" ", "")

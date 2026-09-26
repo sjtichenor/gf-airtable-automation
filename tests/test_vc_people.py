@@ -20,6 +20,11 @@ class NameMatches(unittest.TestCase):
         self.assertTrue(vc_people.name_matches("Paul", "Graham", None))
         self.assertTrue(vc_people.name_matches("Marc", "Andreessen", "Marc Andreessen 🇺🇸"))
         self.assertTrue(vc_people.name_matches("Chamath", "Palihapitiya", "Chamath Palihapitiya"))
+        self.assertTrue(vc_people.name_matches("Hunter", "Walk", "👨🏻‍💻☕️"))
+        self.assertTrue(vc_people.name_matches("Ben", "Horowitz", "benahorowitz.eth"))
+        self.assertTrue(vc_people.name_matches("Patrick", "O'Shaughnessy", "Patrick OShaughnessy"))
+        self.assertTrue(vc_people.name_matches("Martin", "Casado", "martin_casado"))
+        self.assertTrue(vc_people.name_matches("Josh", "Kushner", "Joshua Kushner"))
 
     def test_mismatch(self):
         self.assertFalse(vc_people.name_matches("Bill", "Gurley", "Crypto Deals Daily"))
