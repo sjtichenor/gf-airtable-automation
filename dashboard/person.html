@@ -88,8 +88,16 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .hero h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
 .hero .r{color:var(--muted);font-size:13px;margin-top:2px}
 .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.bdg{display:inline-flex;flex-direction:column;padding:6px 10px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700}
-.bdg small{font-weight:500;color:var(--muted);font-size:11px}
+/* Achievement badges: a medallion icon per kind, coloured by tier. */
+.bdg{display:flex;align-items:center;gap:10px;padding:6px 12px 6px 6px;border-radius:12px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow)}
+.bdg .ico{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 -2px 0 rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.15)}
+.bdg .ico svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bdg .ico.bronze{background:linear-gradient(145deg,#d99a6c,#9a5b2e)}
+.bdg .ico.silver{background:linear-gradient(145deg,#c9d3df,#7b8a9e)}
+.bdg .ico.gold{background:linear-gradient(145deg,#f5d36b,#c48a12)}
+.bdg .ico.diamond{background:linear-gradient(145deg,#8ee3ff,#3b6fe0)}
+.bdg b{display:block;font-size:12.5px;font-weight:700;color:var(--text);line-height:1.2}
+.bdg small{display:block;font-size:11px;color:var(--muted);line-height:1.25;margin-top:1px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:18px}
 .tile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
 .tile .v{font-size:22px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.tile .l{font-size:11px;color:var(--muted)}
@@ -155,7 +163,16 @@ function render(P){
   const av = p.photo ? `<img class="avatar" src="${esc(p.photo)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'avatar',textContent:'${initials}'}))">` : `<div class="avatar">${initials}</div>`;
   const tenure = p.tenure_days!=null ? (p.tenure_days>=365 ? `${(p.tenure_days/365).toFixed(1)} years` : `${p.tenure_days} days`) : null;
   const sub = [p.roles.join(' · ') || 'No role set', p.bootcamp_class, p.team, p.start ? `joined ${nice(p.start)}${tenure?` · ${tenure}`:''}` : null, p.active ? null : 'no longer active'].filter(Boolean).join(' · ');
-  const badges = P.badges.length ? `<div class="badges">${P.badges.map(b=>`<span class="bdg">${esc(b.label)}<small>${esc(b.detail)}</small></span>`).join('')}</div>` : '';
+  // One line icon per badge kind (all inline SVG, so nothing to load).
+  const ICONS = {
+    count: '<svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="M8.5 14.5 7 22l5-3 5 3-1.5-7.5"/></svg>',          // medal
+    million: '<svg viewBox="0 0 24 24"><path d="M5 19l4-9 3 5 2-3 5 7z"/><path d="M12 3v2M17 5l-1.5 1.5M7 5l1.5 1.5"/></svg>',   // summit
+    hundredk: '<svg viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>', // star
+    streak: '<svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',                                            // bolt
+    range: '<svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',                            // layers
+    clean: '<svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.5 7.5 20 19M8.5 16.5 20 5"/></svg>', // scissors
+  };
+  const badges = P.badges.length ? `<div class="badges">${P.badges.map(b=>`<span class="bdg" title="${esc(b.label)}: ${esc(b.detail)}"><span class="ico ${esc(b.tier||'silver')}">${ICONS[b.kind] || ICONS.count}</span><span><b>${esc(b.label)}</b><small>${esc(b.detail)}</small></span></span>`).join('')}</div>` : '';
   const tiles = [
     ['Clips finished', fmt(T.finished)], ['Total views', fmt(T.views)], ['Avg views / clip', fmt(T.avg_views)],
     ['Posts from their clips', fmt(T.posts)], ['Shows', fmt(T.shows)], ['Directed', fmt(T.directed)], ['Mined', fmt(T.mined)], ['Posted', fmt(T.posted)],

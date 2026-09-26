@@ -499,21 +499,25 @@ def person_profile(snap: dict, team_id: str) -> Optional[dict]:
 
     clubs_1m = sum(1 for v in edited if int(v.get("views") or 0) >= 1_000_000)
     clubs_100k = sum(1 for v in edited if int(v.get("views") or 0) >= 100_000)
+    # Each badge carries a kind (which icon) and a tier (which metal), so the
+    # page can draw it without parsing the label.
     badges = []
-    for n, label in ((1000, "1,000 Club"), (500, "500 Club"), (250, "250 Club"), (100, "Century"), (50, "Fifty")):
+    for n, label, tier in ((1000, "1,000 Club", "diamond"), (500, "500 Club", "gold"), (250, "250 Club", "gold"),
+                           (100, "Century", "silver"), (50, "Fifty", "bronze")):
         if len(finished) >= n:
-            badges.append({"label": label, "detail": f"{len(finished):,} clips finished"})
+            badges.append({"kind": "count", "tier": tier, "label": label, "detail": f"{len(finished):,} clips finished"})
             break
     if clubs_1m:
-        badges.append({"label": "1M Club", "detail": f"{clubs_1m} clip{'s' if clubs_1m != 1 else ''} past a million views"})
+        badges.append({"kind": "million", "tier": "gold", "label": "1M Club", "detail": f"{clubs_1m} clip{'s' if clubs_1m != 1 else ''} past a million views"})
     if clubs_100k:
-        badges.append({"label": "100k Club", "detail": f"{clubs_100k} clip{'s' if clubs_100k != 1 else ''} past 100k views"})
+        badges.append({"kind": "hundredk", "tier": "silver", "label": "100k Club", "detail": f"{clubs_100k} clip{'s' if clubs_100k != 1 else ''} past 100k views"})
     if longest >= 7:
-        badges.append({"label": f"{longest}-day streak", "detail": f"longest run of consecutive active days in the last {ACTIVITY_WINDOW_NOTE}"})
+        badges.append({"kind": "streak", "tier": "gold" if longest >= 30 else "silver" if longest >= 14 else "bronze",
+                       "label": f"{longest}-day streak", "detail": f"longest run of consecutive active days in the last {ACTIVITY_WINDOW_NOTE}"})
     if len(shows) >= 5:
-        badges.append({"label": "Range", "detail": f"clips for {len(shows)} different shows"})
+        badges.append({"kind": "range", "tier": "silver", "label": "Range", "detail": f"clips for {len(shows)} different shows"})
     if win_finished >= 10 and win_rev / max(win_finished, 1) <= 0.15:
-        badges.append({"label": "Clean cuts", "detail": f"{win_rev} revisions on {win_finished} clips in the window"})
+        badges.append({"kind": "clean", "tier": "gold", "label": "Clean cuts", "detail": f"{win_rev} revisions on {win_finished} clips in the window"})
     tenure = (today_local().date() - date.fromisoformat(t["start"])).days if t.get("start") else None
 
     return {
