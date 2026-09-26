@@ -163,7 +163,7 @@ def ask(api_key, batch, known, model=None):
     """{id: show|None} for one batch. Anything the model leaves out is None."""
     body = {
         "model": model or os.environ.get("SOURCE_SHOW_MODEL", "claude-sonnet-5"),
-        "max_tokens": 1500,
+        "max_tokens": 4000,  # 1500 cut a 15-video answer off mid-JSON on the first live run
         "messages": [{"role": "user", "content": PROMPT.format(known=", ".join(known) or "(none yet)",
                                                                 videos=json.dumps(batch, ensure_ascii=False, indent=1))}],
     }
@@ -171,10 +171,11 @@ def ask(api_key, batch, known, model=None):
                       json=body, timeout=120)
     if r.status_code != 200:
         raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:200]}")
-    text = "".join(c.get("text", "") for c in r.json().get("content", []))
+    body = r.json()
+    text = "".join(c.get("text", "") for c in body.get("content", []))
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
-        raise RuntimeError(f"no JSON in answer: {text[:200]}")
+        raise RuntimeError(f"no JSON in answer (stop_reason={body.get('stop_reason')}): {text[:200]}")
     answers = json.loads(m.group(0))
     out = {}
     for v in batch:
@@ -193,10 +194,17 @@ def sync(dry_run=False, limit=None):
     if limit:
         cands = cands[:limit]
     known = known_shows(token)
-    labelled, unknown, updates = {}, [], []
+    labelled, unknown, updates, errors = {}, [], [], []
     for i in range(0, len(cands), BATCH):
         batch = [evidence(r) for r in cands[i:i + BATCH]]
-        answers = ask(key, batch, known)
+        try:
+            answers = ask(key, batch, known)
+        except Exception as e:
+            # One bad answer must not sink the other 28 batches; those videos
+            # stay blank and are asked again next hour.
+            log.warning("source show: batch at %d failed: %s", i, e)
+            errors.append(f"{type(e).__name__}: {str(e)[:120]}")
+            continue
         for v in batch:
             show = answers.get(v["id"])
             if show:
@@ -218,7 +226,7 @@ def sync(dry_run=False, limit=None):
     for s in labelled.values():
         counts[s] = counts.get(s, 0) + 1
     summary = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "dry_run": dry_run,
-               "candidates": len(cands), "labelled": len(labelled), "unknown": len(unknown),
+               "candidates": len(cands), "labelled": len(labelled), "unknown": len(unknown), "batch_errors": errors,
                "shows": dict(sorted(counts.items(), key=lambda kv: -kv[1])), "unknown_titles": unknown[:20]}
     if dry_run:
         summary["labels"] = {cands_title(c): labelled.get(c["id"]) for c in cands}
