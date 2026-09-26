@@ -40,6 +40,7 @@ TABLES = {
     "status_logs": "tblnPcYMXNYwLkpYD",
     "demographics": "tblG4ElwziblQZM9E",
     "episodes": "tblHBczQjSraq5hWe",
+    "contacts": "tblOnuiUceesyRxih",
 }
 ACTIVITY_DAYS = int(os.environ.get("DASHBOARD_ACTIVITY_DAYS", "120"))
 
@@ -137,6 +138,24 @@ DM = {
     "segment": "fldwi2ZU45kYJMgjG",   # Segment
     "followers": "fld4AtOLwZ6YZTrye", # Followers
     "week": "fldk2CxcRNWbFqMnX",      # Week
+}
+# Contacts: the base's people table (CRM leads, podcast hosts, and since
+# 2026-09-26 the VC investors the rankings page ranks by X following). Only
+# rows with a Person Type are pulled; the dashboard never shows CRM notes,
+# email or phone.
+CO = {
+    "name": "fldmDEJ1Qv89VIbrF",      # Contact Name (formula)
+    "first": "fldxfGWzpv2UhaCMX",     # First Name
+    "last": "fldqUqJZWjEoR8Dc5",      # Last Name
+    "type": "fld5R2K3bBppiqjNX",      # Person Type (multi-select)
+    "firm": "fld2mgbnrNRHgQDz3",      # Firm
+    "title": "fldyH1qHcAzz9Qr0U",     # Title
+    "x": "fldH55BG99pVcnBaV",         # X (Twitter)
+    "x_followers": "fldMH2BRrtwzYWOfC",  # X Followers
+    "x_name": "fldbmwAwBaIvvdxNd",    # X Name (display name X reports)
+    "x_updated": "fldu5yVZrnPQKsHa0",  # X Followers Updated
+    "photo": "fldh462ZkoHrjYSLS",     # Photo
+    "hosts": "fld8AhkTIpQN4ipxS",     # Hosts Shows (link)
 }
 TE = {
     "name": "fldbUkybFQu3SyAFI",      # Name (formula)
@@ -334,6 +353,7 @@ def build_snapshot() -> dict:
         "status_logs": (TABLES["status_logs"], _flatten(SL.values()), formula),
         "demographics": (TABLES["demographics"], _flatten(DM.values()), None),
         "episodes": (TABLES["episodes"], _flatten(EP.values()), None),
+        "contacts": (TABLES["contacts"], _flatten(CO.values()), '{Person Type} != ""'),
     }
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = {name: pool.submit(fetch_table, *args) for name, args in jobs.items()}
@@ -552,9 +572,25 @@ def build_snapshot() -> dict:
 
     episodes = [shape_episode(r["fields"], r["id"], shows, team) for r in raw["episodes"]]
 
+    people = []
+    for r in raw["contacts"]:
+        f = r["fields"]
+        people.append({
+            "id": r["id"],
+            "name": f.get(CO["name"]) or f"{f.get(CO['first']) or ''} {f.get(CO['last']) or ''}".strip() or "?",
+            "first": f.get(CO["first"]), "last": f.get(CO["last"]),
+            "type": [t.get("name") if isinstance(t, dict) else t for t in (f.get(CO["type"]) or [])],
+            "firm": f.get(CO["firm"]), "title": f.get(CO["title"]),
+            "x": f.get(CO["x"]), "x_followers": f.get(CO["x_followers"]),
+            "x_name": f.get(CO["x_name"]), "x_updated": f.get(CO["x_updated"]),
+            "photo": _thumb_large(f.get(CO["photo"])),
+            "hosts": [s for s in (f.get(CO["hosts"]) or []) if s in shows],
+        })
+
     return {
         "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "episodes": episodes,
+        "people": people,
         "shows": list(shows.values()),
         "channels": list(channels.values()),
         "demographics": demographics,
@@ -719,7 +755,23 @@ def fake_snapshot() -> dict:
         channels.append({"id": "ch" + sid, "name": n + (" (firm)" if i == 4 else " (official)"), "owned": False, "shows": [sid], "status": "Benchmark", "proxy": i == 4,
                          "photo": None, "profiles": {"X": "https://x.com/x", "YouTube": "https://youtube.com/@x"},
                          "followers": {"X": rnd.randint(5000, 400000), "YouTube": rnd.randint(5000, 900000)}})
+    # Investors for the VC people rankings: a few names with made-up counts,
+    # one without a count yet, one whose X display name does not match.
+    people = []
+    for i, (first, last, firm, title, hosts, n, xname) in enumerate([
+            ("Jason", "Calacanis", "LAUNCH", "Founder & GP", ["vc4"], 900_000, "@jason"),
+            ("Paul", "Graham", "Y Combinator", "Co-founder", [], 2_100_000, "Paul Graham"),
+            ("David", "Sacks", "Craft Ventures", "Co-founder & GP", [], 1_400_000, "David Sacks"),
+            ("Turner", "Novak", "Banana Capital", "Founder", ["vc2"], 180_000, "Turner Novak 🍌"),
+            ("Harry", "Stebbings", "20VC", "Founder", [], 240_000, "Harry Stebbings"),
+            ("Ann", "Miura-Ko", "Floodgate", "Co-founding Partner", [], 26_000, "Ann Miura-Ko"),
+            ("Sarah", "Guo", "Conviction", "Founder", ["vc1"], None, None),
+            ("Bill", "Gurley", "Benchmark", "General Partner", [], 640_000, "Crypto Deals Daily")]):
+        people.append({"id": f"p{i}", "name": f"{first} {last}", "first": first, "last": last, "type": ["Investor"] + (["Host"] if hosts else []),
+                       "firm": firm, "title": title, "x": f"https://x.com/{first.lower()}", "x_followers": n, "x_name": xname,
+                       "x_updated": today.isoformat() if n else None, "photo": None, "hosts": hosts})
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "people": people,
             "shows": shows, "channels": channels, "demographics": demographics, "team": team_rows, "videos": videos, "status_logs": status_logs,
             "episodes": fake_episodes(rnd, shows, team_rows),
             "posts": posts, "followers": followers,

@@ -296,6 +296,25 @@ def api_vc(request: Request):
     return JSONResponse(vc_pods.table(snap), headers={"Cache-Control": "private, max-age=120"})
 
 
+@router.get("/vc/people", response_class=HTMLResponse)
+def vc_people_page(request: Request):
+    """VC investors (Contacts tagged Investor) ranked by X following. Any signed-in team member."""
+    if not auth.is_authed(request):
+        return RedirectResponse("/dashboard/login", status_code=303)
+    return HTMLResponse(_read("vc_people.html"))
+
+
+@router.get("/api/vc/people")
+def api_vc_people(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    snap = cache.snapshot
+    if snap is None:
+        return JSONResponse({"error": "warming up", **cache.status()}, status_code=503, headers={"Retry-After": "5"})
+    from . import vc_people
+    return JSONResponse(vc_people.table(snap), headers={"Cache-Control": "private, max-age=120"})
+
+
 @router.get("/team/{team_id}", response_class=HTMLResponse)
 def person_page(request: Request, team_id: str):
     if not auth.is_authed(request):

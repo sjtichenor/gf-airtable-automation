@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Good Future Media · VC podcast rankings</title>
+<title>Good Future Media · VC investor rankings</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -108,6 +108,28 @@ tr.ours .pill{border-color:var(--ours);color:var(--ours)}
 .seg a{padding:6px 14px;font-size:12px;font-weight:500;color:var(--ink2);border-right:1px solid var(--line)}
 .seg a:last-child{border-right:0}
 .seg a.on{background:var(--ink);color:var(--card)}
+
+td.who{font-weight:600}
+td.who .row{display:flex;align-items:center;gap:12px}
+td.who .av{width:32px;height:32px;border-radius:50%;flex:none;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;letter-spacing:.02em;overflow:hidden;border:1px solid var(--line)}
+td.who .av img{width:100%;height:100%;object-fit:cover}
+td.who small{display:block;font-weight:400;color:var(--ink3);font-size:11px;margin-top:2px}
+td.who a.name{cursor:pointer;border-bottom:1px dotted var(--line)}
+td.who a.name:hover{color:var(--accent);border-bottom-color:var(--accent)}
+td.shows{font-size:12px;color:var(--ink2);white-space:normal;max-width:260px}
+td.shows .sp{display:inline-block;border:1px solid var(--line);border-radius:4px;padding:1px 7px;margin:2px 4px 2px 0;font-size:11px;color:var(--ink2)}
+td.shows .sp.vc{border-color:var(--accent);color:var(--accent)}
+td.hx a{color:var(--ink2);border-bottom:1px dotted var(--line)}
+td.hx a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.warn{display:inline-block;margin-left:6px;width:16px;height:16px;border-radius:50%;background:#fff3cd;color:#8a6100;font-size:10px;font-weight:700;text-align:center;line-height:16px;cursor:help;vertical-align:middle}
+:root[data-theme="dark"] .warn{background:#3b2f0a;color:#e8c15a}
+.modal .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;padding:12px 20px;font-size:13px;border-bottom:1px solid var(--line2)}
+.modal .kv .k{color:var(--ink3);font-size:12px}
+.modal .kv a{color:var(--accent)}
+.modal .mh .av{width:48px;height:48px;border-radius:50%;flex:none;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;overflow:hidden;border:1px solid var(--line)}
+.modal .mh .av img{width:100%;height:100%;object-fit:cover}
+.note{padding:10px 20px;font-size:12px;color:#8a6100;background:#fff8e1;border-bottom:1px solid var(--line2)}
+:root[data-theme="dark"] .note{background:#3b2f0a;color:#e8c15a}
 </style>
 </head>
 <body>
@@ -118,12 +140,12 @@ tr.ours .pill{border-color:var(--ours);color:var(--ours)}
 </div></header>
 <main>
   <div class="eyebrow">Benchmark</div>
-  <h1>VC podcast rankings</h1>
-  <p class="lead" style="margin-bottom:12px">Every show tagged Venture Capital, ranked by the following of its official accounts. Ranks are per platform; the total sums the platforms we track for that show.</p>
+  <h1>VC investor rankings</h1>
+  <p class="lead" style="margin-bottom:12px">Individual venture capitalists, ranked by their following on X. People only: the firms and the podcasts have their own table.</p>
   <p class="byline"><svg class="mark" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><circle cx="32" cy="32" r="32" fill="url(#g2)"/><path d="M40.5 22.5a12 12 0 1 0 3.2 11.2H32" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>Compiled by <b>Good Future Media</b> · the podcast clipping studio · goodfuturemedia.com</p>
-  <div class="seg"><a class="on" href="/dashboard/vc">Podcasts</a><a href="/dashboard/vc/people">Investors</a></div>
+  <div class="seg"><a href="/dashboard/vc">Podcasts</a><a class="on" href="/dashboard/vc/people">Investors</a></div>
   <div class="kpis" id="kpis"></div>
-  <div class="card"><div class="hd"><h2>Leaderboard</h2><span id="sub">Click a column to sort</span></div><div class="wrap"><table id="t"></table></div><div class="credit"><span class="who"><svg class="mark" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true"><defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><circle cx="32" cy="32" r="32" fill="url(#g3)"/><path d="M40.5 22.5a12 12 0 1 0 3.2 11.2H32" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>Good Future Media · VC Podcast Rankings</span><span id="asof"></span></div></div>
+  <div class="card"><div class="hd"><h2>Leaderboard</h2><span id="sub">Click a column to sort</span></div><div class="wrap"><table id="t"></table></div><div class="credit"><span class="who"><svg class="mark" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true"><defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#7c3aed"/></linearGradient></defs><circle cx="32" cy="32" r="32" fill="url(#g3)"/><path d="M40.5 22.5a12 12 0 1 0 3.2 11.2H32" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>Good Future Media · VC Investor Rankings</span><span id="asof"></span></div></div>
   <div class="foot" id="foot"></div>
 </main>
 <script>
@@ -132,62 +154,65 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = n => n == null ? '' : n.toLocaleString();
 const short = n => n >= 1e6 ? (n/1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n/1e3) + 'K' : String(n);
+const initials = r => ((r.first || r.name || '?')[0] + ((r.last || '')[0] || '')).toUpperCase();
 const root = document.documentElement, KEY = 'gf-theme';
 const applyTheme = t => { root.setAttribute('data-theme', t); $('#theme').textContent = t === 'dark' ? 'Light' : 'Dark'; };
 applyTheme(localStorage.getItem(KEY) || 'light');
 $('#theme').onclick = () => { const t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; localStorage.setItem(KEY, t); applyTheme(t); };
-let D = null, sort = {k:'total', d:-1};
-const val = (r, k) => k === 'total' ? r.total : k === 'name' ? r.name.toLowerCase() : (r.counts[k] ?? -1);
+let D = null, sort = {k:'followers', d:-1};
+const val = (r, k) => k === 'followers' ? (r.followers ?? -1) : k === 'name' ? (r.last || r.name).toLowerCase() : k === 'firm' ? (r.firm || '').toLowerCase() : k === 'shows' ? r.shows.length : 0;
+const warn = r => r.suspect ? `<span class="warn" title="X reports this account as ${esc(r.x_name)}, which does not look like ${esc(r.name)}. The handle may be wrong; check it before quoting the number.">!</span>` : '';
 function render(){
   const rows = [...D.rows].sort((a,b) => { const x = val(a, sort.k), y = val(b, sort.k); return (x > y ? 1 : x < y ? -1 : 0) * sort.d; });
-  const max = {}; D.platforms.forEach(p => max[p] = Math.max(...D.rows.map(r => r.counts[p] || 0)));
-  const cols = [['rank','#'], ['name','Show'], ...D.platforms.map(p => [p, p]), ['total','Total']];
-  $('#t').innerHTML = '<thead><tr>' + cols.map(([k,l]) => `<th class="${k==='name'||k==='rank'?'':'n'}" data-k="${k}">${l}${sort.k===k?(sort.d<0?' ↓':' ↑'):''}</th>`).join('') + '</tr></thead><tbody>'
-    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}${r.pending?' pending':''}"><td class="rank">${r.pending?'—':i+1}</td><td class="show"><a class="name" data-show="${esc(r.id)}" title="Show details">${esc(r.name)}</a>${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
-      + D.platforms.map(p => {
-          const link = r.links && r.links[p];
-          if (r.counts[p] == null) return link ? `<td class="n dash"><a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile (no count yet)">—</a></td>` : '<td class="n dash">—</td>';
-          const num = fmt(r.counts[p]);
-          const px = r.proxy && r.proxy[p] ? `<span class="ast" title="Not the show's own account: this is ${esc(r.proxy[p].replace(/ \((firm|official)\)$/, ''))}'s ${p}, standing in for the show. Apples to oranges next to a show's own account.">*</span>` : '';
-          return `<td class="n"><span class="r ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${link ? `<a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile">${num}</a>` : num}${px}<span class="bar"><i style="width:${Math.max(2, 100*r.counts[p]/(max[p]||1)).toFixed(0)}%"></i></span></td>`;
-        }).join('')
-      + `<td class="n">${r.pending?'<span class="dash" title="Accounts added; counts arrive with the next follower sync">awaiting sync</span>':`<b>${fmt(r.total)}</b>`}</td></tr>`).join('') + '</tbody>';
-  $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (k === 'rank') return; sort = {k, d: sort.k===k ? -sort.d : (k==='name'?1:-1)}; render(); });
-  $('#t').querySelectorAll('a.name').forEach(a => a.onclick = ev => { ev.preventDefault(); openShow(a.dataset.show); });
-  const ours = D.rows.filter(r => r.ours);
-  const leader = D.rows[0];
+  const max = Math.max(...D.rows.map(r => r.followers || 0), 1);
+  const cols = [['rank','#'], ['name','Investor'], ['firm','Firm'], ['shows','Hosts'], ['handle','X'], ['followers','X followers']];
+  $('#t').innerHTML = '<thead><tr>' + cols.map(([k,l]) => `<th class="${k==='followers'?'n':''}" data-k="${k}">${l}${sort.k===k?(sort.d<0?' ↓':' ↑'):''}</th>`).join('') + '</tr></thead><tbody>'
+    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}${r.pending?' pending':''}"><td class="rank">${r.pending?'—':(sort.k==='followers'&&sort.d<0?r.rank:i+1)}</td>`
+      + `<td class="who"><div class="row"><span class="av">${r.photo?`<img src="${esc(r.photo)}" alt="">`:initials(r)}</span><div><a class="name" data-id="${esc(r.id)}" title="Details">${esc(r.name)}</a>${warn(r)}${r.ours?'<span class="pill">Our host</span>':''}${r.title?`<small>${esc(r.title)}</small>`:''}</div></div></td>`
+      + `<td>${esc(r.firm || '')}</td>`
+      + `<td class="shows">${r.shows.map(s => `<span class="sp ${s.vc?'vc':''}" title="${s.vc?'A show on the podcast table':'A show in our database'}">${esc(s.name)}</span>`).join('') || '<span class="dash">—</span>'}</td>`
+      + `<td class="hx">${r.x ? `<a href="${esc(r.x)}" target="_blank" rel="noopener" title="Open the X profile">@${esc(r.handle || '')}</a>` : '<span class="dash">—</span>'}</td>`
+      + `<td class="n">${r.pending ? '<span class="dash" title="Added; the count arrives with the next X sync">awaiting sync</span>' : `<b>${fmt(r.followers)}</b><span class="bar"><i style="width:${Math.max(2, 100*r.followers/max).toFixed(0)}%"></i></span>`}</td></tr>`).join('') + '</tbody>';
+  $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (k === 'rank' || k === 'handle') return; sort = {k, d: sort.k===k ? -sort.d : (k==='followers'||k==='shows'?-1:1)}; render(); });
+  $('#t').querySelectorAll('a.name').forEach(a => a.onclick = ev => { ev.preventDefault(); openPerson(a.dataset.id); });
+  const leader = D.rows.find(r => !r.pending);
+  const ours = D.rows.filter(r => r.ours && !r.pending);
+  const total = D.rows.reduce((s, r) => s + (r.followers || 0), 0);
   $('#kpis').innerHTML = [
-    ['Shows ranked', D.ranked.total, D.pending ? `${D.pending} more awaiting their first sync` : `${D.platforms.length} platforms tracked`],
-    ...(leader ? [['Leader', esc(leader.name), `${short(leader.total)} combined`]] : []),
-    ...ours.map(r => [esc(r.name), `#${r.rank.total} of ${D.ranked.total}`, D.platforms.filter(p=>r.rank[p]).map(p=>`#${r.rank[p]} ${p}`).join(' · ')]),
+    ['Investors ranked', D.ranked, D.pending ? `${D.pending} more awaiting their first sync` : 'by X following'],
+    ...(leader ? [['Leader', esc(leader.name), `${short(leader.followers)} followers`]] : []),
+    ['Combined reach', short(total), 'followers across everyone ranked'],
+    ...(ours.length ? [['Hosts of our shows', ours.length, ours.slice(0, 3).map(r => `#${r.rank} ${esc(r.last || r.name)}`).join(' · ')]] : []),
+    ...(D.suspect ? [['Names to check', D.suspect, 'X reports a different name; see the ! marks']] : []),
   ].map(([l,v,s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
   const asof = (D.generated_at||'').replace('T',' ').slice(0,16) + ' UTC';
   $('#asof').textContent = `Data as of ${asof}`;
-  const nProxy = D.rows.filter(r => r.proxy && Object.keys(r.proxy).length).length;
-  $('#foot').innerHTML = (nProxy ? `<div class="legend"><span class="ast">*</span> A count marked with an asterisk comes from a firm's or host's account standing in for the show (Y Combinator for Lightcone, Sequoia for Crucible Moments, Stripe's Instagram for Cheeky Pint), not the show's own. Hover the asterisk to see whose. ${nProxy} show${nProxy===1?'':'s'} on this table have one.</div>` : '') + `Counts are the Channels follower fields: X and YouTube refresh daily, Instagram and TikTok monthly via Social Blade. Rankings compiled by <span class="site">Good Future Media · goodfuturemedia.com</span>.`;
-  $('#meta').textContent = `${D.rows.length} shows` + (D.pending ? ` · ${D.pending} awaiting first sync` : '');
+  $('#foot').innerHTML = `Counts are the Contacts "X Followers" field, refreshed daily from the X API${D.updated ? ` (last check ${esc(D.updated)})` : ''}. Blue show tags are podcasts on the <a href="/dashboard/vc" style="color:var(--accent)">podcast table</a>. Rankings compiled by <span class="site">Good Future Media · goodfuturemedia.com</span>.`;
+  $('#meta').textContent = `${D.rows.length} investors` + (D.pending ? ` · ${D.pending} awaiting first sync` : '');
 }
-const ALL = ['YouTube', 'X', 'Instagram', 'TikTok', 'Facebook', 'Threads', 'LinkedIn'];
-function openShow(id){
+function openPerson(id){
   const r = D.rows.find(x => x.id === id); if (!r) return;
-  closeShow();
-  const bg = document.createElement('div'); bg.className = 'modal-bg'; bg.id = 'showModal';
-  const accts = r.accounts.map(a => {
-    const rows = ALL.filter(p => a.profiles[p] || a.followers[p] != null).map(p => {
-      const n = a.followers[p]; const url = a.profiles[p];
-      return `<div class="plat"><span class="pn">${p}</span><span class="pu">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.replace(/^https?:\/\/(www\.)?/, ''))}</a>` : '<span>no profile listed</span>'}</span><span class="pc">${n != null ? fmt(n) : '<span class="dash">—</span>'}${r.rank && r.rank[p] && r.counts[p] === n ? `<small>#${r.rank[p]}</small>` : ''}</span></div>`;
-    }).join('');
-    return `<div class="acct"><div class="an">${esc(a.name)}${a.status ? ` · ${esc(a.status)}` : ''}${a.proxy ? '<span class="px">* stands in for the show</span>' : ''}</div>${rows || '<div class="dash" style="font-size:12px">No profiles on this account yet.</div>'}</div>`;
-  }).join('');
-  bg.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(r.name)}"><div class="mh">${r.logo ? `<img src="${esc(r.logo)}" alt="">` : ''}<div><h3>${esc(r.name)}</h3><div class="meta">${[r.relationship, ...(r.category || [])].filter(Boolean).map(esc).join(' · ')}${r.rank?.total ? ` · #${r.rank.total} of ${D.ranked.total} overall` : ''}</div></div><button id="mClose" title="Close (Esc)">✕</button></div>${accts}<div class="ft">${r.youtube ? `<a href="${esc(r.youtube)}" target="_blank" rel="noopener">YouTube channel ↗</a>` : ''}<a href="https://airtable.com/appxCYu0Tfwc6h7X7/tblKMC5hDmmc7YsVW/${esc(r.id)}" target="_blank" rel="noopener">Show in Airtable ↗</a><span>Counts: the Channels follower fields; ranks as on the table.</span></div></div>`;
-  bg.onclick = ev => { if (ev.target === bg) closeShow(); };
+  closePerson();
+  const bg = document.createElement('div'); bg.className = 'modal-bg'; bg.id = 'personModal';
+  const kv = [
+    ['Rank', r.pending ? 'awaiting first sync' : `#${r.rank} of ${D.ranked}`],
+    ['X followers', r.pending ? '—' : fmt(r.followers)],
+    ['X profile', r.x ? `<a href="${esc(r.x)}" target="_blank" rel="noopener">@${esc(r.handle || '')} ↗</a>` : '—'],
+    ['X reports the name', r.x_name ? esc(r.x_name) : '<span class="dash">not checked yet</span>'],
+    ['Last checked', r.x_updated ? esc(r.x_updated) : '—'],
+    ['Firm', esc(r.firm || '—')],
+    ['Title', esc(r.title || '—')],
+    ['Hosts', r.shows.length ? r.shows.map(s => esc(s.name)).join(', ') : '—'],
+  ].map(([k, v]) => `<span class="k">${k}</span><span>${v}</span>`).join('');
+  bg.innerHTML = `<div class="modal" role="dialog" aria-label="${esc(r.name)}"><div class="mh"><span class="av">${r.photo?`<img src="${esc(r.photo)}" alt="">`:initials(r)}</span><div><h3>${esc(r.name)}</h3><div class="meta">${[r.firm, r.title].filter(Boolean).map(esc).join(' · ')}</div></div><button id="mClose" title="Close (Esc)">✕</button></div>${r.suspect ? `<div class="note">X reports this account as “${esc(r.x_name)}”, which does not look like ${esc(r.name)}. The handle may belong to someone else; check it in Airtable before quoting the number.</div>` : ''}<div class="kv">${kv}</div><div class="ft"><a href="https://airtable.com/appxCYu0Tfwc6h7X7/tblOnuiUceesyRxih/${esc(r.id)}" target="_blank" rel="noopener">Contact in Airtable ↗</a><span>Count: Contacts “X Followers”, refreshed daily.</span></div></div>`;
+  bg.onclick = ev => { if (ev.target === bg) closePerson(); };
   document.body.appendChild(bg);
-  $('#mClose').onclick = closeShow;
+  $('#mClose').onclick = closePerson;
   document.addEventListener('keydown', escClose);
 }
-function escClose(ev){ if (ev.key === 'Escape') closeShow(); }
-function closeShow(){ const m = $('#showModal'); if (m) m.remove(); document.removeEventListener('keydown', escClose); }
-fetch('/dashboard/api/vc', {credentials:'same-origin'}).then(r => r.json()).then(d => { D = d; if (!d.rows) throw 0; render(); }).catch(() => { $('#t').innerHTML = '<tr><td class="empty">Nothing to rank yet — counts arrive after the next follower sync.</td></tr>'; });
+function escClose(ev){ if (ev.key === 'Escape') closePerson(); }
+function closePerson(){ const m = $('#personModal'); if (m) m.remove(); document.removeEventListener('keydown', escClose); }
+fetch('/dashboard/api/vc/people', {credentials:'same-origin'}).then(r => r.json()).then(d => { D = d; if (!d.rows) throw 0; render(); }).catch(() => { $('#t').innerHTML = '<tr><td class="empty">Nothing to rank yet — tag people as Investor in Contacts and the counts arrive with the next X sync.</td></tr>'; });
 })();
 </script>
 </body>
