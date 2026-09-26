@@ -97,6 +97,9 @@ from dashboard.routes import clients as client_router, router as dashboard_route
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.include_router(dashboard_router)
 app.include_router(client_router)
+# Instant metrics for a new post (replaces the contractor's webhook service).
+from webhook.new_post import router as webhook_router  # noqa: E402
+app.include_router(webhook_router)
 
 
 @app.on_event("startup")
