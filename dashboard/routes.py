@@ -480,6 +480,62 @@ def api_link_episodes_preview(request: Request, limit: int = 100):
         return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
 
 
+# ── Source review: clips missing a show or episode, for a person to settle ──
+
+def _review_allowed(request: Request):
+    session = auth.is_authed(request)
+    if not session:
+        return None, JSONResponse({"error": "unauthorized"}, status_code=401)
+    team_rows = (cache.snapshot or {}).get("team", [])
+    if not (auth.is_admin(session) or auth.is_exec(session, team_rows)):
+        return None, JSONResponse({"error": "execs only"}, status_code=403)
+    return session, None
+
+
+@router.get("/sources", response_class=HTMLResponse)
+def sources_page(request: Request):
+    if not auth.is_authed(request):
+        return RedirectResponse("/dashboard/login", status_code=303)
+    return HTMLResponse(_read("sources.html"))
+
+
+@router.get("/api/sources")
+def api_sources(request: Request, refresh: int = 0):
+    _, err = _review_allowed(request)
+    if err:
+        return err
+    from videos import source_review
+    if os.environ.get("DASHBOARD_FAKE_DATA"):
+        return JSONResponse({"rows": source_review.fake_rows(), "shows": ["Lightspeed", "The Peel", "PokerNews Podcast"]})
+    try:
+        return JSONResponse({"rows": source_review.fetch(force=bool(refresh)), "shows": source_review.known_shows()},
+                            headers={"Cache-Control": "private, max-age=30"})
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
+@router.post("/api/sources/set")
+async def api_sources_set(request: Request):
+    session, err = _review_allowed(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    from videos import source_review
+    if os.environ.get("DASHBOARD_FAKE_DATA"):
+        return JSONResponse({"ok": True, "fields": {k: body.get(k) for k in ("show", "episode", "url")}})
+    try:
+        fields = source_review.write(body.get("id"), body.get("show"), body.get("episode"), body.get("url"))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+    log.info("sources: %s set %s -> %s", session.get("email"), body.get("id"), {k: v for k, v in body.items() if k != "id"})
+    return JSONResponse({"ok": True, "fields": fields})
+
+
 @router.get("/api/link-episodes/status")
 def api_link_episodes_status(request: Request):
     if not auth.is_authed(request):
