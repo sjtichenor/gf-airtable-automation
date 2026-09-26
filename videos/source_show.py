@@ -257,10 +257,39 @@ def content_blocks(batch, known, images=True):
     n = 0
     for video in batch:
         if images and video.get("image") and thin(video):
+            # Anthropic's URL fetcher is refused by airtableusercontent.com's
+            # robots.txt (every batch 400'd on 2026-09-26), so the bytes go
+            # inline instead. A fetch that fails just drops the image.
+            got = fetch_image(video["image"])
+            if not got:
+                continue
+            media_type, data = got
             blocks.append({"type": "text", "text": f"Video {video['id']} screenshot:"})
-            blocks.append({"type": "image", "source": {"type": "url", "url": video["image"]}})
+            blocks.append({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}})
             n += 1
     return blocks, n
+
+
+MAX_IMAGE_BYTES = 4 * 1024 * 1024
+
+
+def fetch_image(url):
+    """(media_type, base64 data) for an image URL, or None. Airtable's large
+    thumbnails are a few hundred KB; anything over MAX_IMAGE_BYTES or not an
+    image is skipped."""
+    try:
+        r = requests.get(url, timeout=20)
+    except requests.RequestException as e:
+        log.warning("source show: image fetch failed: %s", e)
+        return None
+    ctype = (r.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if r.status_code != 200 or not ctype.startswith("image/") or len(r.content) > MAX_IMAGE_BYTES:
+        log.warning("source show: image skipped (%s, %s, %d bytes)", r.status_code, ctype or "?", len(r.content))
+        return None
+    if ctype == "image/jpg":
+        ctype = "image/jpeg"
+    import base64
+    return ctype, base64.b64encode(r.content).decode("ascii")
 
 
 def ask(api_key, batch, known, model=None, images=None):
@@ -276,7 +305,7 @@ def ask(api_key, batch, known, model=None, images=None):
     }
     headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
     r = requests.post(ANTHROPIC, headers=headers, json=body, timeout=120)
-    if r.status_code == 400 and n_images and "image" in r.text.lower():
+    if r.status_code == 400 and n_images:
         # One image the API could not fetch (an expired Airtable URL, say)
         # must not cost the whole batch its text answer: ask again without.
         log.warning("source show: image rejected (%s); retrying batch without images", r.text[:120])

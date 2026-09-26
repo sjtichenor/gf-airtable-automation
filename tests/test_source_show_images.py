@@ -14,6 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from videos import source_show as ss  # noqa: E402
 
+# No network in tests: the image fetch is stubbed to echo the URL as its "bytes".
+ss.fetch_image = lambda url: ("image/jpeg", "b64:" + url)
+
 LARGE = "https://v5.airtableusercontent.com/large/shot.jpg"
 FULL = "https://v5.airtableusercontent.com/full/shot.jpg"
 THUMB = "https://v5.airtableusercontent.com/large/thumb.png"
@@ -87,7 +90,7 @@ class ContentBlocks(unittest.TestCase):
         self.assertIn('"recTHIN"', blocks[0]["text"])
         self.assertNotIn(LARGE, blocks[0]["text"], "the URL is not part of the JSON evidence")
         self.assertEqual(blocks[1]["text"], "Video recTHIN screenshot:")
-        self.assertEqual(blocks[2], {"type": "image", "source": {"type": "url", "url": LARGE}})
+        self.assertEqual(blocks[2], {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "b64:" + LARGE}})
 
     def test_video_without_image_is_text_only(self):
         blocks, n = ss.content_blocks([ss.evidence(record())], [])
@@ -119,9 +122,9 @@ class ContentBlocks(unittest.TestCase):
         self.assertEqual(n, 2)
         self.assertEqual([b["type"] for b in blocks], ["text", "text", "image", "text", "image"])
         self.assertEqual(blocks[1]["text"], "Video recA screenshot:")
-        self.assertEqual(blocks[2]["source"]["url"], LARGE)
+        self.assertEqual(blocks[2]["source"]["data"], "b64:" + LARGE)
         self.assertEqual(blocks[3]["text"], "Video recC screenshot:")
-        self.assertEqual(blocks[4]["source"]["url"], THUMB)
+        self.assertEqual(blocks[4]["source"]["data"], "b64:" + THUMB)
 
 
 class Ask(unittest.TestCase):
@@ -141,7 +144,7 @@ class Ask(unittest.TestCase):
         content = body["messages"][0]["content"]
         self.assertIsInstance(content, list)
         self.assertEqual([b["type"] for b in content], ["text", "text", "image"])
-        self.assertEqual(content[2]["source"], {"type": "url", "url": LARGE})
+        self.assertEqual(content[2]["source"], {"type": "base64", "media_type": "image/jpeg", "data": "b64:" + LARGE})
         self.assertEqual(post.call_args.args[0], ss.ANTHROPIC)
 
     def test_env_switch_off_sends_text_only(self):
