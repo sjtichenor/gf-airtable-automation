@@ -47,12 +47,13 @@ F = {
     "client": "fldSqPARmtwxe9m15",    # Client Account (link)
     "episode": "flda34XvSlQaFXapj",   # Full Episode (link)
     "source": "fldW950uakYMpCGxr",    # Source Show (text, ours)
-    "yt_title": "fldK1spMcwCSb8srL",  # YouTube title
-    "tweet": "fldbteQua126m01Zz",     # tweet copy
-    "tweet2": "fldtpn48iHbElFTh6",    # tweet copy (approved)
-    "hashtags": "fldaUn8aFP5bToKg4",
-    "notes": "fldQC5mrvisd8rQ3m",     # HOOK / OPEN / CLOSE / SOURCE
-    "ai_notes": "fld9EoWkILV5apHVU",  # copywriter output, starts with its research
+    "yt_title": "fldK1spMcwCSb8srL",  # YouTube Title
+    "tweet": "fldy3EkUij952pIt4",     # Tweet
+    "yt_desc": "fldbteQua126m01Zz",   # YouTube Description ("-- @toly ... on @ThePeelPod")
+    "tt_desc": "fldtpn48iHbElFTh6",   # TikTok/IG Description
+    "hashtags": "fldaUn8aFP5bToKg4",  # TikTok/IG Hashtags
+    "notes": "fldQC5mrvisd8rQ3m",     # Description: HOOK / OPEN / CLOSE / SOURCE
+    "ai_notes": "fld9EoWkILV5apHVU",  # AI Copywriter output, starts with its research
 }
 UNKNOWN = "Unknown"
 ANTHROPIC = "https://api.anthropic.com/v1/messages"
@@ -100,7 +101,7 @@ def list_candidates(token):
     if not ids:
         return []
     recs = _get(token, {"filterByFormula": 'AND({Source Show} = "", {Client Account} != "", {Full Episode} = "")',
-                        "fields[]": [F["title"], F["client"], F["yt_title"], F["tweet"], F["tweet2"], F["hashtags"], F["notes"], F["ai_notes"]]})
+                        "fields[]": [F["title"], F["client"], F["yt_title"], F["tweet"], F["yt_desc"], F["tt_desc"], F["hashtags"], F["notes"], F["ai_notes"]]})
     return [r for r in recs if any(x in ids for x in (r["fields"].get(F["client"]) or []))]
 
 
@@ -119,8 +120,15 @@ def evidence(rec):
     # The copywriter's research sits above its first divider; the tweets
     # below repeat the attribution anyway.
     ai = re.split(r"\n[─═]{4,}|\n── ", ai)[0][:500]
-    tweet = (f.get(F["tweet2"]) or f.get(F["tweet"]) or "").strip()
-    attrib = [ln.strip() for ln in tweet.splitlines() if re.search(r"\bon (the )?@|\bon the .{2,40}(pod|podcast|show)\b|podcast", ln, re.I)]
+    # The attribution line ("-- @toly, Co-Founder of Solana, on @ThePeelPod")
+    # is repeated across the tweet and both descriptions; take it wherever it is.
+    copy = "\n".join((f.get(k) or "") for k in (F["tweet"], F["yt_desc"], F["tt_desc"]))
+    tweet = (f.get(F["tweet"]) or f.get(F["yt_desc"]) or "").strip()
+    attrib = []
+    for ln in copy.splitlines():
+        ln = ln.strip()
+        if ln and ln not in attrib and re.search(r"\bon (the )?@|\bon the .{2,40}(pod|podcast|show)\b|podcast", ln, re.I):
+            attrib.append(ln)
     return {
         "id": rec["id"],
         "title": (f.get(F["title"]) or "").strip(),
