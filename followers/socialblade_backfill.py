@@ -31,7 +31,7 @@ from urllib.parse import urlparse, parse_qs
 import requests
 
 from snapshot_followers import (API, HEADERS, CHANNELS, LOGS, CHANNEL_NAME, F_PLATFORM, F_DATE, F_COUNT,
-                                F_PREVIOUS, F_CHANNEL, list_all, write)
+                                F_PREVIOUS, F_CHANNEL, PLATFORM_FIELDS, list_all, write)
 
 CLIENT_ID = os.environ.get("SOCIALBLADE_CLIENT_ID", "")
 SB_TOKEN = os.environ.get("SOCIALBLADE_TOKEN", "")
@@ -146,7 +146,7 @@ def existing_rows(channel_id, label):
 
 
 def channels():
-    fields = [CHANNEL_NAME, "Status"] + [v[0] for v in PLATFORM_MAP.values()]
+    fields = [CHANNEL_NAME, "Status"] + [v[0] for v in PLATFORM_MAP.values()] + list(PLATFORM_FIELDS)
     out = []
     for r in list_all(CHANNELS, **{"fields[]": fields}):
         f = r["fields"]
@@ -210,11 +210,26 @@ def run():
                 print(f"  {name} / {label} ({handle}): HTTP {code}, no daily rows; status={json.dumps((body or {}).get('status'))[:200]}; credits left: {left}")
                 skipped += 1
                 continue
+            # Who Social Blade thinks this handle is, so a wrong-but-existing
+            # handle (someone else's account) is caught in the log review.
+            ident = ((body.get("data") or {}).get("id") or {}) if isinstance(body, dict) else {}
+            who = ident.get("display_name") or ident.get("username") or ident.get("handle") or "?"
+            print(f"  {name} / {label} ({handle}) is \"{who}\" on Social Blade")
             if len(rows) <= 2:
                 # Social Blade only started tracking this account now: nothing to back-fill.
                 untracked.append(f"{name} / {label}")
             else:
                 tracked.append(f"{name} / {label} ({rows[0][0]} → {rows[-1][0]}, {len(rows)} days)")
+            # The dashboards read the Channels follower field, and for an
+            # account no platform sync can reach (a Benchmark channel, or a
+            # blank field) this is the only thing that will ever fill it.
+            field = next((f for f, p in PLATFORM_FIELDS.items() if p == label), None)
+            latest_date, latest_n = rows[-1]
+            status = ch["fields"].get("Status")
+            if field and (status == "Benchmark" or ch["fields"].get(field) is None) \
+                    and (today - date.fromisoformat(latest_date)).days <= 7:
+                write(CHANNELS, "PATCH", [{"id": cid, "fields": {field: latest_n}}])
+                print(f"    Channels {field} <- {latest_n:,} ({latest_date})")
             if isinstance(left, int) and left < MIN_CREDITS:
                 print(f"  credits left {left} < SB_MIN_CREDITS {MIN_CREDITS}; stopping after this profile")
                 stop = True

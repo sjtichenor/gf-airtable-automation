@@ -239,6 +239,23 @@ if __name__ == "__main__":
     # see. Both always run: the backfill is wrapped so that a Social Blade
     # failure can never stop the snapshot, which is the mistake that cost
     # eleven days of YouTube and X history from 2026-09-10.
+    # Three ways to run the Social Blade step, all read here so a flag left
+    # on cannot keep spending credits: SB_MODE (every run, the original
+    # switch); SB_ONCE=YYYY-MM-DD (only on that date -- for a one-off pull,
+    # no cleanup needed); SB_MONTHLY_ONLY=<name filter> (on day SB_MONTHLY_DAY,
+    # default 1, for the channels whose name contains the filter -- the VC
+    # benchmark accounts' Instagram/TikTok refresh, 2026-09-26).
+    today_ = date.fromisoformat(TODAY)
+    scheduled = None
+    if os.environ.get("SB_ONCE") == TODAY:
+        scheduled = "SB_ONCE"
+    elif os.environ.get("SB_MONTHLY_ONLY") and today_.day == int(os.environ.get("SB_MONTHLY_DAY", "1")):
+        scheduled = "SB_MONTHLY_ONLY"
+        os.environ["SB_ONLY"] = os.environ["SB_MONTHLY_ONLY"]
+        os.environ.setdefault("SB_PLATFORMS", "instagram,tiktok")
+    if scheduled:
+        os.environ["SB_MODE"] = "run"
+        print(f"Social Blade step scheduled by {scheduled}")
     if os.environ.get("SB_MODE"):
         try:
             import socialblade_backfill
