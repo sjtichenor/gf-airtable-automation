@@ -57,7 +57,7 @@ VIDEOS = "tblu3ur57YdUMWw1B"
 F = {
     "title": "fldgMXwbozJdOUjiu",     # Video Title
     "client": "fldSqPARmtwxe9m15",    # Client Account (link)
-    "episode": "flda34XvSlQaFXapj",   # Full Episode (link)
+    "full_episode": "flda34XvSlQaFXapj",   # Full Episode (link)
     "source": "fldW950uakYMpCGxr",    # Source Show (text, ours)
     "episode": "fld9LeMsRUyqJ9bzL",   # Source Episode (text, ours)
     "url": "fldkAXEuh8TcBFcs0",       # Source URL (ours)
