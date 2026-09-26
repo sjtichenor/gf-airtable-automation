@@ -5,3 +5,6 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+
+# agent worktrees and local tooling
+.claude/
