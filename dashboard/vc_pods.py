@@ -31,11 +31,24 @@ def table(snap: dict) -> dict:
         # account instead of @bg2pod.
         official = ([c for c in chans if c.get("status") == "Benchmark"]
                     or [c for c in chans if not c.get("owned")] or chans)
-        counts = {}
+        counts, links = {}, {}
         for p in PLATFORMS:
-            vals = [c["followers"][p] for c in official if isinstance((c.get("followers") or {}).get(p), (int, float))]
-            if vals:
-                counts[p] = int(max(vals))
+            # The count shown is the largest across the show's accounts; the
+            # link goes to that same account's profile so a click confirms it.
+            best = None
+            for c in official:
+                n = (c.get("followers") or {}).get(p)
+                if isinstance(n, (int, float)) and (best is None or n > best[0]):
+                    best = (n, c)
+            if best:
+                counts[p] = int(best[0])
+                url = (best[1].get("profiles") or {}).get(p)
+                if url:
+                    links[p] = url
+            elif official:
+                url = next(((c.get("profiles") or {}).get(p) for c in official if (c.get("profiles") or {}).get(p)), None)
+                if url:
+                    links[p] = url  # profile listed, no count yet
         # A show with accounts but no counts yet (added today, syncs not run)
         # still gets a row, marked pending, so the page shows the field and
         # not a mystery gap.
@@ -47,7 +60,8 @@ def table(snap: dict) -> dict:
             "ours": sh.get("relationship") in ("Client", "Owned"),
             "logo": sh.get("logo"),
             "accounts": [{"name": c["name"], "profiles": c.get("profiles") or {}} for c in official],
-            "counts": counts, "total": sum(counts.values()),
+            "counts": counts, "links": links, "total": sum(counts.values()),
+            "youtube": sh.get("youtube"),
         })
     # Ranks per platform and overall; ties share a rank.
     ranks = {}

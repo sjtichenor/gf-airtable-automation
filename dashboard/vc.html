@@ -64,6 +64,8 @@ td.show{font-weight:600}
 td.show small{display:block;font-weight:400;color:var(--ink3);font-size:11px;margin-top:2px}
 td .r{display:inline-block;min-width:26px;color:var(--ink3);font-size:11px;margin-right:8px;text-align:right}
 td .r.top{color:var(--gold);font-weight:600}
+a.prof{border-bottom:1px dotted var(--line);padding-bottom:1px}
+a.prof:hover{color:var(--accent);border-bottom-color:var(--accent)}
 td .bar{display:inline-block;height:4px;border-radius:2px;background:var(--line);vertical-align:middle;margin-left:10px;width:72px;position:relative;overflow:hidden}
 td .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ink);opacity:.55}
 tr.ours td{background:var(--accent-soft)}
@@ -109,8 +111,13 @@ function render(){
   const max = {}; D.platforms.forEach(p => max[p] = Math.max(...D.rows.map(r => r.counts[p] || 0)));
   const cols = [['rank','#'], ['name','Show'], ...D.platforms.map(p => [p, p]), ['total','Total']];
   $('#t').innerHTML = '<thead><tr>' + cols.map(([k,l]) => `<th class="${k==='name'||k==='rank'?'':'n'}" data-k="${k}">${l}${sort.k===k?(sort.d<0?' ↓':' ↑'):''}</th>`).join('') + '</tr></thead><tbody>'
-    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}${r.pending?' pending':''}"><td class="rank">${r.pending?'—':i+1}</td><td class="show">${esc(r.name)}${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
-      + D.platforms.map(p => r.counts[p] == null ? '<td class="n dash">—</td>' : `<td class="n"><span class="r ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${fmt(r.counts[p])}<span class="bar"><i style="width:${Math.max(2, 100*r.counts[p]/(max[p]||1)).toFixed(0)}%"></i></span></td>`).join('')
+    + rows.map((r, i) => `<tr class="${r.ours?'ours':''}${r.pending?' pending':''}"><td class="rank">${r.pending?'—':i+1}</td><td class="show">${r.youtube ? `<a class="prof" href="${esc(r.youtube)}" target="_blank" rel="noopener" title="Open the show's YouTube channel">${esc(r.name)}</a>` : esc(r.name)}${r.ours?`<span class="pill">${esc(r.relationship)}</span>`:''}<small>${r.accounts.map(a=>esc(a.name)).join(' · ')}</small></td>`
+      + D.platforms.map(p => {
+          const link = r.links && r.links[p];
+          if (r.counts[p] == null) return link ? `<td class="n dash"><a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile (no count yet)">—</a></td>` : '<td class="n dash">—</td>';
+          const num = fmt(r.counts[p]);
+          return `<td class="n"><span class="r ${r.rank[p]<=3?'top':''}">#${r.rank[p]}</span>${link ? `<a class="prof" href="${esc(link)}" target="_blank" rel="noopener" title="Open the ${p} profile">${num}</a>` : num}<span class="bar"><i style="width:${Math.max(2, 100*r.counts[p]/(max[p]||1)).toFixed(0)}%"></i></span></td>`;
+        }).join('')
       + `<td class="n">${r.pending?'<span class="dash" title="Accounts added; counts arrive with the next follower sync">awaiting sync</span>':`<b>${fmt(r.total)}</b>`}</td></tr>`).join('') + '</tbody>';
   $('#t').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.k; if (k === 'rank') return; sort = {k, d: sort.k===k ? -sort.d : (k==='name'?1:-1)}; render(); });
   const ours = D.rows.filter(r => r.ours);
