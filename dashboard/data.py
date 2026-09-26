@@ -109,6 +109,7 @@ VI = {
     "episode": "flda34XvSlQaFXapj",   # Full Episode (link)
     "views": "fldBTytz2Zd8oUOKl",     # Views rollup (SUM across its posts)
     "post_count": "fld3JS6ACIpCHGlYf",  # how many posts that video became
+    "source_show": "fldW950uakYMpCGxr",  # Source Show: the podcast/event a clip was cut from (videos/source_show.py)
 }
 SL = {
     "status": "fld0AbS8C4hW6idfb",    # Status
@@ -432,6 +433,9 @@ def build_snapshot() -> dict:
             "started": f.get(VI["started"]),
             "finished": f.get(VI["finished"]),
             "speaker": f.get(VI["speaker"]) or "",
+            # Where a clip with no episode of ours actually came from. "Unknown"
+            # is the sync's "asked, nothing there" marker and reads as blank.
+            "source_show": (lambda x: x if x and x != "Unknown" else None)((f.get(VI["source_show"]) or "").strip()),
             "views": f.get(VI["views"]),
             "posts": f.get(VI["post_count"]),
         }
@@ -649,6 +653,7 @@ def fake_snapshot() -> dict:
             t = end
         cur = hist[-1][0]
         videos.append({"id": f"v{n}", "title": f"Clip {n}: something someone said", "show": show_names[n % 6], "editor": ed, "director": di,
+                       "source_show": ["The Peel", "Lightspeed", "PokerNews Podcast", None, "Bloomberg Crypto"][n % 5],
                        "episode": (f"Episode {300 - n // 3}: " + rnd.choice(["The bond market is warning us", "Why nobody trusts the news", "AI bears are asking the wrong question"])) if n % 5 else None,
                        "miner": rnd.choice(editors), "client": None, "type": "Clip", "tier": "1 - Basic", "status": cur,
                        "status_since": hist[-1][1].isoformat(timespec="seconds") + "Z", "created": t0.isoformat(timespec="seconds") + "Z",
@@ -933,7 +938,7 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
                  else [f for f in snap.get("followers", []) if f["channel"] in channel_ids])
     demographics = [d for d in snap.get("demographics", []) if d["channel"] in channel_ids]
     show_names = {sh["name"] for sh in primary}
-    vkeep = ("id", "title", "show", "episode", "type", "created", "views", "posts")  # no pipeline state leaves the server
+    vkeep = ("id", "title", "show", "source_show", "episode", "type", "created", "views", "posts")  # no pipeline state leaves the server
     accounts = client_video_accounts().get((slug or "").strip().lower())
     if match:
         pick = lambda v: hit(v.get("title"))
@@ -963,6 +968,9 @@ def client_view(snap: dict, slug: str) -> Optional[dict]:
     if match or hide_shows:
         for v in videos:
             v["show"] = None
+    if match:
+        for v in videos:
+            v["source_show"] = None
     if hide_shows:
         for p in posts:
             p["show"] = None

@@ -112,6 +112,9 @@ def _warm_dashboard() -> None:
     # X follower counts for every channel with a Twitter Profile, daily.
     from followers.x_followers import start_background as start_x_followers
     start_x_followers()
+    # Source Show on Videos (which podcast a client's clip was cut from), hourly.
+    from videos.source_show import start_background as start_source_show
+    start_source_show()
 
 
 def missing_config() -> List[str]:

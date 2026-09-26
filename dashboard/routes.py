@@ -397,6 +397,31 @@ def api_x_followers_status(request: Request):
     return JSONResponse({"configured": x_followers.configured(), **x_followers.last})
 
 
+@router.post("/api/source-shows/sync")
+def api_source_shows_sync(request: Request, dry: int = 0, limit: int = 0):
+    """Label videos with the show they were cut from, now. Admins only."""
+    session = auth.is_authed(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not auth.is_admin(session):
+        return JSONResponse({"error": "admins only"}, status_code=403)
+    from videos import source_show
+    if not source_show.configured():
+        return JSONResponse({"error": "ANTHROPIC_API_KEY not set"}, status_code=503)
+    try:
+        return JSONResponse(source_show.sync(dry_run=bool(dry), limit=limit or None))
+    except Exception as e:
+        return JSONResponse({"error": f"{type(e).__name__}: {str(e)[:300]}"}, status_code=502)
+
+
+@router.get("/api/source-shows/status")
+def api_source_shows_status(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    from videos import source_show
+    return JSONResponse({"configured": source_show.configured(), **source_show.last})
+
+
 @router.get("/api/stripe/status")
 def api_stripe_status(request: Request):
     if not auth.is_authed(request):
