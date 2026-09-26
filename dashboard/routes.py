@@ -277,6 +277,25 @@ def team_page(request: Request):
     return HTMLResponse(_read("team.html"))
 
 
+@router.get("/vc", response_class=HTMLResponse)
+def vc_page(request: Request):
+    """VC podcast rankings by following. Any signed-in team member."""
+    if not auth.is_authed(request):
+        return RedirectResponse("/dashboard/login", status_code=303)
+    return HTMLResponse(_read("vc.html"))
+
+
+@router.get("/api/vc")
+def api_vc(request: Request):
+    if not auth.is_authed(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    snap = cache.snapshot
+    if snap is None:
+        return JSONResponse({"error": "warming up", **cache.status()}, status_code=503, headers={"Retry-After": "5"})
+    from . import vc_pods
+    return JSONResponse(vc_pods.table(snap), headers={"Cache-Control": "private, max-age=120"})
+
+
 @router.get("/team/{team_id}", response_class=HTMLResponse)
 def person_page(request: Request, team_id: str):
     if not auth.is_authed(request):

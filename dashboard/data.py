@@ -74,6 +74,8 @@ SH = {
     "client": "fldaMsJNvRpddhUIr",        # Client Account
     "logo": "fldZZsHZ4bliqgLmh",          # Podcast Logo
     "default_miner": "fldE0FjzekRf7Kh2u",  # Default Miner (link to Team) -- who usually mines it
+    "category": "fldQkHazOS0n0soGd",      # Category (multi-select: Venture Capital, Startups, ...)
+    "youtube": "fldGzPNoD9LwSobL4",       # YouTube Channel
 }
 PO = {
     "url": "fldJBwCXb4Hu8DOGp",       # Link to Post
@@ -386,6 +388,8 @@ def build_snapshot() -> dict:
             # their own section and suggests the show's usual miner.
             "default_miner_id": _first(f.get(SH["default_miner"])),
             "default_miner": team.get(_first(f.get(SH["default_miner"])) or "", None),
+            "category": [c.get("name") if isinstance(c, dict) else c for c in (f.get(SH["category"]) or [])],
+            "youtube": f.get(SH["youtube"]),
         }
 
     channels = {}
@@ -592,7 +596,8 @@ def fake_episodes(rnd, shows, team_rows):
 def fake_snapshot() -> dict:
     rnd = random.Random(7)
     show_names = ["All-In", "The Techno Optimist", "Good Politics", "20VC", "Solana", "ThursdAI"]
-    shows = [{"id": f"show{i}", "name": n, "relationship": rnd.choice(["Client", "Owned"]), "client": None, "logo": None, "default_miner_id": None, "default_miner": None}
+    shows = [{"id": f"show{i}", "name": n, "relationship": rnd.choice(["Client", "Owned"]), "client": None, "logo": None, "default_miner_id": None, "default_miner": None,
+              "category": ["Venture Capital"] if n in ("All-In", "20VC") else ["Tech"], "youtube": None}
              for i, n in enumerate(show_names)]
     platforms = ["Instagram", "TikTok", "YouTube", "X", "Facebook", "Threads"]
     channels = []
@@ -694,6 +699,16 @@ def fake_snapshot() -> dict:
             demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "Country", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
         for seg, share in [("New York, New York", .08), ("Los Angeles, California", .06), ("London, England", .05), ("San Francisco, California", .04), ("Toronto, Ontario", .03), ("Chicago, Illinois", .02)]:
             demographics.append({"channel": ch["id"], "platform": "Instagram", "dimension": "City", "segment": seg, "followers": int(total * share * rnd.uniform(.7, 1.3)), "week": today.isoformat()})
+    # A few benchmark pods (other people's shows, official accounts only) so
+    # the VC rankings page has a field to rank against. Added last so the
+    # fixture loops above, which index shows by position, never see them.
+    for i, n in enumerate(["Acquired", "No Priors", "The Peel", "Invest Like the Best", "This Week in Startups"]):
+        sid = f"vc{i}"
+        shows.append({"id": sid, "name": n, "relationship": "Watchlist", "client": None, "logo": None, "default_miner_id": None,
+                      "default_miner": None, "category": ["Venture Capital"], "youtube": None})
+        channels.append({"id": "ch" + sid, "name": n + " (official)", "owned": False, "shows": [sid], "status": "Benchmark",
+                         "photo": None, "profiles": {"X": "https://x.com/x", "YouTube": "https://youtube.com/@x"},
+                         "followers": {"X": rnd.randint(5000, 400000), "YouTube": rnd.randint(5000, 900000)}})
     return {"generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
             "shows": shows, "channels": channels, "demographics": demographics, "team": team_rows, "videos": videos, "status_logs": status_logs,
             "episodes": fake_episodes(rnd, shows, team_rows),

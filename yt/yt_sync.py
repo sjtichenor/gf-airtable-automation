@@ -410,10 +410,36 @@ class YouTubeSync:
             match = re.search(pattern, youtube_url)
             if match:
                 custom_name = match.group(1)
-                # Need to resolve custom name to channel ID using YouTube API
+                # An @handle or a /user/ name has an exact, 1-unit lookup.
+                # The search fallback below costs 100 units and returns
+                # whatever ranks first, which is not always the channel.
+                if '/@(' in pattern:
+                    return self.resolve_youtube_channel_id_exact({'forHandle': custom_name})
+                if '/user/(' in pattern:
+                    return self.resolve_youtube_channel_id_exact({'forUsername': custom_name})
                 return self.resolve_youtube_channel_id_by_name(custom_name)
-        
+
         return None
+
+    _exact_cache = {}
+
+    def resolve_youtube_channel_id_exact(self, key):
+        """channels.list with forHandle= or forUsername=: exact match, 1 quota unit."""
+        k = tuple(sorted(key.items()))
+        if k in self._exact_cache:
+            return self._exact_cache[k]
+        try:
+            response = requests.get(f"{self.youtube_base_url}/channels", params={'key': self.youtube_api_key, 'part': 'id', **key})
+            data = response.json()
+            items = data.get('items') or []
+            cid = items[0]['id'] if items else None
+            if not cid:
+                print(f"      Warning: no channel for {key}")
+            self._exact_cache[k] = cid
+            return cid
+        except Exception as e:
+            print(f"      Error resolving {key}: {e}")
+            return None
 
     def resolve_youtube_channel_id_by_name(self, channel_name):
         """Resolve YouTube channel custom name/handle to channel ID"""
